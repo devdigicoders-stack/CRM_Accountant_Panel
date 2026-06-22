@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { 
   User, Mail, Phone, MapPin, Briefcase, Calendar, 
-  MessageSquare, DollarSign, CheckCircle, Clock, XCircle, ArrowLeft,
+  MessageSquare, CheckCircle, Clock, XCircle, ArrowLeft,
   ExternalLink, CreditCard, FileText
 } from 'lucide-react';
 
@@ -430,7 +430,6 @@ export default function LeadDetails() {
               <div>
                 <p className="text-sm text-gray-500 font-medium mb-1">Deal Value</p>
                 <div className="p-3 bg-green-50 text-green-800 rounded-lg border border-green-100 font-bold text-lg flex items-center">
-                  <DollarSign size={18} className="mr-1" />
                   ₹{lead.dealValue?.toLocaleString() || 0}
                 </div>
               </div>
