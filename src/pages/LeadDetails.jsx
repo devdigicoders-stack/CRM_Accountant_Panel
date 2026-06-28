@@ -427,13 +427,40 @@ export default function LeadDetails() {
                   {lead.productDetails || 'No details provided'}
                 </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-500 font-medium mb-1">Deal Value</p>
-                <div className="p-3 bg-green-50 text-green-800 rounded-lg border border-green-100 font-bold text-lg flex items-center">
-                  ₹{lead.dealValue?.toLocaleString() || 0}
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-500 font-medium mb-1">Deal Value</p>
+                  <div className="p-3 bg-green-50 text-green-800 rounded-lg border border-green-100 font-bold text-lg flex items-center">
+                    ₹{lead.dealValue?.toLocaleString() || 0}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium mb-1">Amount Paid</p>
+                  <div className="p-3 bg-blue-50 text-blue-800 rounded-lg border border-blue-100 font-bold text-lg flex items-center">
+                    ₹{lead.amountPaid?.toLocaleString() || 0}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium mb-1">Pending Amount</p>
+                  <div className="p-3 bg-red-50 text-red-800 rounded-lg border border-red-100 font-bold text-lg flex items-center">
+                    ₹{lead.pendingAmount?.toLocaleString() || 0}
+                  </div>
                 </div>
               </div>
             </div>
+            {lead.paymentScreenshot && (
+              <div className="flex items-start gap-3 mt-4 pt-4 border-t border-gray-100">
+                <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                  <FileText size={20} />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Payment Screenshot / Receipt</p>
+                  <a href={`${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${lead.paymentScreenshot}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-orange-600 hover:underline flex items-center gap-1">
+                    View Confirmed Payment Screenshot <ExternalLink size={12} />
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Remarks / Timeline */}
