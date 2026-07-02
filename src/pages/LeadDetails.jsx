@@ -374,7 +374,7 @@ export default function LeadDetails() {
                   <p className="text-sm text-gray-500 font-medium">Phone Number</p>
                   <p className="text-gray-800 font-medium">{lead.phone}</p>
                   {lead.integrations?.callUri && (
-                    <a href={lead.integrations.callUri} className="text-xs text-blue-600 hover:underline">Call Now</button>
+                    <a href={lead.integrations.callUri} className="text-xs text-blue-600 hover:underline">Call Now</a>
                   )}
                 </div>
               </div>
