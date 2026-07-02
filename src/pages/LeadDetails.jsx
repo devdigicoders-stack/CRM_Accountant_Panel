@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import WhatsAppChooserModal from '../components/WhatsAppChooserModal';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -20,6 +21,8 @@ const getStatusColor = (status) => {
 };
 
 export default function LeadDetails() {
+  const [waModalLead, setWaModalLead] = useState(null);
+
   const { id } = useParams();
   const navigate = useNavigate();
   const { token } = useAuth();
@@ -371,7 +374,7 @@ export default function LeadDetails() {
                   <p className="text-sm text-gray-500 font-medium">Phone Number</p>
                   <p className="text-gray-800 font-medium">{lead.phone}</p>
                   {lead.integrations?.callUri && (
-                    <a href={lead.integrations.callUri} className="text-xs text-blue-600 hover:underline">Call Now</a>
+                    <a href={lead.integrations.callUri} className="text-xs text-blue-600 hover:underline">Call Now</button>
                   )}
                 </div>
               </div>
@@ -387,9 +390,9 @@ export default function LeadDetails() {
                 <div>
                   <p className="text-sm text-gray-500 font-medium">WhatsApp</p>
                   {lead.integrations?.whatsappLink ? (
-                    <a href={lead.integrations.whatsappLink} target="_blank" rel="noreferrer" className="text-green-600 hover:underline font-medium flex items-center">
+                    <button onClick={() => setWaModalLead(lead)} className="text-green-600 hover:underline font-medium flex items-center">
                       Chat on WhatsApp <ExternalLink size={12} className="ml-1" />
-                    </a>
+                    </button>
                   ) : (
                     <p className="text-gray-400 text-sm">Not available</p>
                   )}
@@ -628,6 +631,7 @@ export default function LeadDetails() {
         </div>
 
       </div>
+      <WhatsAppChooserModal link={waModalLead?.integrations?.whatsappLink} phone={waModalLead?.phone} isOpen={!!waModalLead} onClose={() => setWaModalLead(null)} />
     </div>
   );
 }
