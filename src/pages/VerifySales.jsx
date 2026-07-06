@@ -16,15 +16,21 @@ const getStatusStyle = (status) => {
 
 export default function VerifySales() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('pending');
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { token } = useAuth();
   const navigate = useNavigate();
 
-  const fetchPendingSales = async () => {
+  const fetchSales = async () => {
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/accounts/leads?verificationStatus=pending`, {
+      setLoading(true);
+      const url = statusFilter === 'all' 
+        ? `${import.meta.env.VITE_API_BASE_URL}/accounts/leads` 
+        : `${import.meta.env.VITE_API_BASE_URL}/accounts/leads?verificationStatus=${statusFilter}`;
+        
+      const response = await axios.get(url, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -45,9 +51,9 @@ export default function VerifySales() {
 
   useEffect(() => {
     if (token) {
-      fetchPendingSales();
+      fetchSales();
     }
-  }, [token]);
+  }, [token, statusFilter]);
 
   const handleVerify = async (id, status) => {
     const { value: remarks } = await Swal.fire({
@@ -83,8 +89,12 @@ export default function VerifySales() {
 
         if (response.data.status === 'success') {
           Swal.fire('Success!', `Lead has been ${status}.`, 'success');
-          // Remove the lead from the pending list
-          setLeads(prev => prev.filter(lead => lead._id !== id));
+          // If we are currently viewing 'pending', remove it. Otherwise leave it or refetch.
+          if (statusFilter === 'pending') {
+            setLeads(prev => prev.filter(lead => lead._id !== id));
+          } else {
+            fetchSales();
+          }
         } else {
           Swal.fire('Error', 'Failed to update verification status', 'error');
         }
@@ -128,15 +138,20 @@ export default function VerifySales() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex w-full md:w-auto gap-3">
-          <button className="flex items-center px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors bg-white">
-            <Calendar size={18} className="mr-2 text-gray-500" />
-            Date Range
-          </button>
-          <button className="flex items-center px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors bg-white">
-            <Filter size={18} className="mr-2 text-gray-500" />
-            Status Filter
-          </button>
+        <div className="flex w-full md:w-auto gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
+          {['pending', 'verified', 'rejected', 'all'].map(status => (
+            <button 
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap capitalize transition-colors ${
+                statusFilter === status 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {status}
+            </button>
+          ))}
         </div>
       </div>
 

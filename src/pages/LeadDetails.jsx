@@ -74,24 +74,38 @@ export default function LeadDetails() {
 
   const handleInvoiceUpload = async () => {
     const { value: uploadResponse } = await Swal.fire({
-      title: 'Upload Invoice',
-      text: 'Select a PDF or image file',
-      input: 'file',
-      inputAttributes: {
-        'accept': 'application/pdf, image/jpeg, image/png',
-        'aria-label': 'Upload your invoice'
-      },
+      title: 'Upload Invoice & AWB',
+      html: `
+        <div class="space-y-4 text-left px-2 mt-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Invoice Document *</label>
+            <input type="file" id="swal-invoice-file" accept="application/pdf, image/jpeg, image/png" class="w-full p-2 border border-gray-300 rounded-lg">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">AWB Number (Optional)</label>
+            <input type="text" id="swal-awb-number" placeholder="Enter AWB or Tracking Number" class="w-full p-2 border border-gray-300 rounded-lg">
+          </div>
+        </div>
+      `,
       showCancelButton: true,
       confirmButtonText: 'Upload',
       showLoaderOnConfirm: true,
-      preConfirm: async (file) => {
+      preConfirm: async () => {
+        const fileInput = document.getElementById('swal-invoice-file');
+        const awbInput = document.getElementById('swal-awb-number');
+        const file = fileInput.files[0];
+        const awbNumber = awbInput.value.trim();
+
         if (!file) {
-          Swal.showValidationMessage('Please select a file');
+          Swal.showValidationMessage('Please select an invoice file');
           return false;
         }
         
         const formData = new FormData();
         formData.append('invoice', file);
+        if (awbNumber) {
+          formData.append('awbNumber', awbNumber);
+        }
         
         try {
           const response = await axios.put(
@@ -452,16 +466,29 @@ export default function LeadDetails() {
               </div>
             </div>
             {lead.paymentScreenshot && (
-              <div className="flex items-start gap-3 mt-4 pt-4 border-t border-gray-100">
-                <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
-                  <FileText size={20} />
+              <div className="flex flex-col sm:flex-row sm:items-start gap-4 mt-4 pt-4 border-t border-gray-100">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">Payment Screenshot / Receipt</p>
+                    <a href={`${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${lead.paymentScreenshot}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-orange-600 hover:underline flex items-center gap-1">
+                      View Confirmed Payment Screenshot <ExternalLink size={12} />
+                    </a>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Payment Screenshot / Receipt</p>
-                  <a href={`${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${lead.paymentScreenshot}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-orange-600 hover:underline flex items-center gap-1">
-                    View Confirmed Payment Screenshot <ExternalLink size={12} />
-                  </a>
-                </div>
+                {lead.awbNumber && (
+                  <div className="flex items-start gap-3 sm:ml-8">
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                      <FileText size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 font-medium">AWB / Tracking Number</p>
+                      <p className="font-semibold text-indigo-600">{lead.awbNumber}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
