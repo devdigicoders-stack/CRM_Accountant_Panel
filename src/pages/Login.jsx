@@ -5,6 +5,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useFont } from "../context/FontContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Eye, EyeOff } from "lucide-react";
 import { initNotifications, listenForMessages } from "../utils/firebase";
 
 const Login = () => {
@@ -14,6 +15,7 @@ const Login = () => {
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { setLoginData } = useAuth();
   const { themeColors } = useTheme();
@@ -156,22 +158,32 @@ const Login = () => {
             >
               Password
             </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={credentials.password}
-              onChange={handleChange}
-              required
-              className="w-full p-3 rounded-lg border text-sm focus:outline-none focus:ring-2 transition-all"
-              style={{
-                backgroundColor: themeColors.background,
-                color: themeColors.text,
-                borderColor: themeColors.border,
-              }}
-              placeholder="Enter your password"
-              disabled={isLoading}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                name="password"
+                value={credentials.password}
+                onChange={handleChange}
+                required
+                className="w-full p-3 pr-10 rounded-lg border text-sm focus:outline-none focus:ring-2 transition-all"
+                style={{
+                  backgroundColor: themeColors.background,
+                  color: themeColors.text,
+                  borderColor: themeColors.border,
+                }}
+                placeholder="Enter your password"
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                style={{ color: themeColors.textSecondary }}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
 
           {/* Submit Button */}
