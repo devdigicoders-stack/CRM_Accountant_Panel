@@ -110,6 +110,39 @@ export default function VerifySales() {
     lead._id?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleExport = () => {
+    if (!filteredLeads || filteredLeads.length === 0) {
+      Swal.fire('Info', 'No data to export', 'info');
+      return;
+    }
+
+    const headers = ['Lead ID', 'Customer Name', 'Phone', 'Email', 'Deal Value', 'Date', 'Status', 'Verification Status'];
+    const csvRows = [headers.join(',')];
+
+    filteredLeads.forEach(lead => {
+      const row = [
+        lead._id,
+        `"${lead.name || ''}"`,
+        lead.phone || '',
+        lead.email || '',
+        lead.dealValue || '0',
+        lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : '',
+        lead.status || '',
+        lead.verificationStatus || 'pending'
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Verify_Sales_${statusFilter}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -119,7 +152,10 @@ export default function VerifySales() {
           <p className="text-gray-500 mt-1">Review and verify recent sales transactions.</p>
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm font-medium">
+          <button 
+            onClick={handleExport}
+            className="flex items-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm font-medium"
+          >
             <Download size={18} className="mr-2" />
             Export
           </button>
