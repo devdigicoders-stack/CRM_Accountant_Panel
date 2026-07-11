@@ -413,8 +413,23 @@ export default function LeadDetails() {
                 </div>
               </div>
               <div className="flex items-start gap-3">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Briefcase size={18} /></div>
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Assigned Sales Person</p>
+                  {lead.assignedTo ? (
+                    <div>
+                      <p className="font-semibold text-gray-800">{lead.assignedTo.name}</p>
+                      {lead.assignedTo.phone && <p className="text-xs text-gray-500">{lead.assignedTo.phone}</p>}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm italic">Unassigned</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
                 <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><User size={18} /></div>
                 <div>
+                  <p className="text-sm text-gray-500 font-medium">Verification Status</p>
                   <p className="font-semibold text-gray-800">{lead.verificationStatus === 'verified' ? 'Approved & Verified' : lead.verificationStatus === 'rejected' ? 'Rejected' : 'Pending Verification'}</p>
                 </div>
               </div>
