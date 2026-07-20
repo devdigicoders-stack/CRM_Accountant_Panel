@@ -480,32 +480,43 @@ export default function LeadDetails() {
                 </div>
               </div>
             </div>
-            {lead.paymentScreenshot && (
-              <div className="flex flex-col sm:flex-row sm:items-start gap-4 mt-4 pt-4 border-t border-gray-100">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
-                    <FileText size={20} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 font-medium">Payment Screenshot / Receipt</p>
-                    <a href={`${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${lead.paymentScreenshot}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-orange-600 hover:underline flex items-center gap-1">
-                      View Confirmed Payment Screenshot <ExternalLink size={12} />
-                    </a>
-                  </div>
-                </div>
-                {lead.awbNumber && (
-                  <div className="flex items-start gap-3 sm:ml-8">
-                    <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4 mt-4 pt-4 border-t border-gray-100">
+              {(() => {
+                const screenshots = Array.from(new Set([
+                  ...(Array.isArray(lead.paymentScreenshots) ? lead.paymentScreenshots : []),
+                  ...(lead.paymentScreenshot ? [lead.paymentScreenshot] : [])
+                ]));
+                if (screenshots.length === 0) return null;
+                return (
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
                       <FileText size={20} />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500 font-medium">AWB / Tracking Number</p>
-                      <p className="font-semibold text-indigo-600">{lead.awbNumber}</p>
+                      <p className="text-sm text-gray-500 font-medium">Payment Screenshots / Receipts ({screenshots.length})</p>
+                      <div className="flex flex-col gap-1 mt-1">
+                        {screenshots.map((url, i) => (
+                          <a key={i} href={`${import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '')}${url}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-orange-600 hover:underline flex items-center gap-1 text-sm">
+                            View Confirmed Payment Screenshot {screenshots.length > 1 ? i + 1 : ''} <ExternalLink size={12} />
+                          </a>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
+                );
+              })()}
+              {lead.awbNumber && (
+                <div className="flex items-start gap-3 sm:ml-8">
+                  <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">AWB / Tracking Number</p>
+                    <p className="font-semibold text-indigo-600">{lead.awbNumber}</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Remarks / Timeline */}
