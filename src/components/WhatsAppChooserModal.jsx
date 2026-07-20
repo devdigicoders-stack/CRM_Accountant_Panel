@@ -8,7 +8,8 @@ const WhatsAppChooserModal = ({ link, phone, isOpen, onClose }) => {
     // We maintain the chooser for UX consistency with mobile
     let url = link;
     if (!url && phone) {
-      const cleanPhone = phone.replace(/\D/g, '');
+      let cleanPhone = phone.replace(/\D/g, '');
+      if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
       url = `https://wa.me/${cleanPhone}`;
     }
     if (url) {
