@@ -37,7 +37,7 @@ export default function LeadManagement() {
   const fetchLeads = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/accounts/leads`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/accounts/leads?limit=1000`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.data.status === 'success') {

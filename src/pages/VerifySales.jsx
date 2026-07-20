@@ -27,8 +27,8 @@ export default function VerifySales() {
     try {
       setLoading(true);
       const url = statusFilter === 'all' 
-        ? `${import.meta.env.VITE_API_BASE_URL}/accounts/leads` 
-        : `${import.meta.env.VITE_API_BASE_URL}/accounts/leads?verificationStatus=${statusFilter}`;
+        ? `${import.meta.env.VITE_API_BASE_URL}/accounts/leads?limit=1000` 
+        : `${import.meta.env.VITE_API_BASE_URL}/accounts/leads?verificationStatus=${statusFilter}&limit=1000`;
         
       const response = await axios.get(url, {
         headers: {
