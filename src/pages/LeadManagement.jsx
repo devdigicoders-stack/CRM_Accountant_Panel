@@ -27,6 +27,27 @@ export default function LeadManagement() {
   const [actionLoading, setActionLoading] = useState(false);
   const [openDropdownId, setOpenDropdownId] = useState(null);
 
+  const [seenLeads, setSeenLeads] = useState(() => {
+    try {
+      const saved = localStorage.getItem('seen_lead_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const markLeadAsSeen = (leadId) => {
+    if (leadId && !seenLeads.includes(leadId)) {
+      const updated = [...seenLeads, leadId];
+      setSeenLeads(updated);
+      try {
+        localStorage.setItem('seen_lead_ids', JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = () => setOpenDropdownId(null);
@@ -321,19 +342,36 @@ export default function LeadManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredLeads.map((lead) => (
-                  <tr key={lead._id} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
-                          {lead.name ? lead.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
+                {filteredLeads.map((lead) => {
+                  const isNew = !seenLeads.includes(lead._id);
+                  return (
+                    <tr 
+                      key={lead._id} 
+                      className={`transition-colors cursor-pointer ${
+                        isNew 
+                          ? 'bg-blue-50/80 hover:bg-blue-100/90 border-l-4 border-blue-500 font-semibold' 
+                          : 'hover:bg-blue-50/30'
+                      }`}
+                      onClick={() => markLeadAsSeen(lead._id)}
+                    >
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
+                            {lead.name ? lead.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-gray-800">{lead.name}</p>
+                              {isNew && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-600 text-white tracking-wide uppercase shadow-xs animate-pulse">
+                                  NEW
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5">Added: {new Date(lead.createdAt).toLocaleDateString()}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-gray-800">{lead.name}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">Added: {new Date(lead.createdAt).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                    </td>
+                      </td>
                     <td className="p-4">
                       <div className="space-y-1">
                         <p className="text-sm text-gray-600 flex items-center">
@@ -434,7 +472,8 @@ export default function LeadManagement() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>
