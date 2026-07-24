@@ -7,7 +7,7 @@ import Swal from 'sweetalert2';
 import { 
   User, Mail, Phone, MapPin, Briefcase, Calendar, 
   MessageSquare, CheckCircle, Clock, XCircle, ArrowLeft,
-  ExternalLink, CreditCard, FileText
+  ExternalLink, CreditCard, FileText, Edit
 } from 'lucide-react';
 
 const getStatusColor = (status) => {
@@ -73,22 +73,24 @@ export default function LeadDetails() {
   };
 
   const handleInvoiceUpload = async () => {
+    const isEdit = !!lead.invoiceUrl;
     const { value: uploadResponse } = await Swal.fire({
-      title: 'Upload Invoice & AWB',
+      title: isEdit ? 'Edit Invoice & AWB' : 'Upload Invoice & AWB',
       html: `
         <div class="space-y-4 text-left px-2 mt-4">
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Invoice Document *</label>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Invoice Document ${isEdit ? '(Optional for replacement)' : '*'}</label>
             <input type="file" id="swal-invoice-file" accept="application/pdf, image/jpeg, image/png" class="w-full p-2 border border-gray-300 rounded-lg">
           </div>
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">AWB Number (Optional)</label>
-            <input type="text" id="swal-awb-number" placeholder="Enter AWB or Tracking Number" class="w-full p-2 border border-gray-300 rounded-lg">
+            <label class="block text-sm font-semibold text-gray-700 mb-1">AWB Number *</label>
+            <input type="text" id="swal-awb-number" value="${lead.awbNumber || ''}" placeholder="Enter AWB or Tracking Number" class="w-full p-2 border border-gray-300 rounded-lg">
           </div>
         </div>
       `,
       showCancelButton: true,
-      confirmButtonText: 'Upload',
+      confirmButtonText: isEdit ? 'Update' : 'Upload',
+      confirmButtonColor: '#2563EB',
       showLoaderOnConfirm: true,
       preConfirm: async () => {
         const fileInput = document.getElementById('swal-invoice-file');
@@ -96,16 +98,20 @@ export default function LeadDetails() {
         const file = fileInput.files[0];
         const awbNumber = awbInput.value.trim();
 
-        if (!file) {
+        if (!file && !isEdit) {
           Swal.showValidationMessage('Please select an invoice file');
+          return false;
+        }
+        if (!awbNumber) {
+          Swal.showValidationMessage('Please enter the AWB / Tracking Number');
           return false;
         }
         
         const formData = new FormData();
-        formData.append('invoice', file);
-        if (awbNumber) {
-          formData.append('awbNumber', awbNumber);
+        if (file) {
+          formData.append('invoice', file);
         }
+        formData.append('awbNumber', awbNumber);
         
         try {
           const response = await axios.put(
@@ -127,7 +133,7 @@ export default function LeadDetails() {
     });
 
     if (uploadResponse && uploadResponse.status === 'success') {
-      Swal.fire('Success', 'Invoice uploaded successfully!', 'success');
+      Swal.fire('Success', isEdit ? 'Invoice & AWB updated successfully!' : 'Invoice uploaded successfully!', 'success');
       setLead(uploadResponse.data.lead);
     }
   };
@@ -644,8 +650,17 @@ export default function LeadDetails() {
                   </button>
                 )}
                 {lead.invoiceUrl && (
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium mb-4">
-                    <CheckCircle size={16} /> Invoice Uploaded
+                  <div className="space-y-2 mb-4">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium w-full justify-center">
+                      <CheckCircle size={16} /> Invoice Uploaded (AWB: {lead.awbNumber || 'N/A'})
+                    </div>
+                    <button
+                      disabled={actionLoading}
+                      className="w-full py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg shadow-xs border border-gray-300 transition-all disabled:opacity-50 flex justify-center items-center gap-2 text-sm"
+                      onClick={handleInvoiceUpload}
+                    >
+                      <Edit size={16} /> Edit Invoice & AWB
+                    </button>
                   </div>
                 )}
                 {lead.verificationStatus === 'verified' && !lead.transferredToInstallation && (

@@ -110,39 +110,65 @@ export default function LeadManagement() {
     }
   };
 
-  const handleInvoiceUpload = async (id) => {
-    const { value: file } = await Swal.fire({
-      title: 'Upload Invoice',
-      input: 'file',
-      inputAttributes: {
-        'accept': 'application/pdf,image/*',
-        'aria-label': 'Upload invoice document'
-      },
+  const handleInvoiceUpload = async (id, leadObj = {}) => {
+    const isEdit = !!leadObj.invoiceUrl;
+    const { value: uploadResponse } = await Swal.fire({
+      title: isEdit ? 'Edit Invoice & AWB' : 'Upload Invoice & AWB',
+      html: `
+        <div class="space-y-4 text-left px-2 mt-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Invoice Document ${isEdit ? '(Optional for replacement)' : '*'}</label>
+            <input type="file" id="swal-invoice-file" accept="application/pdf, image/jpeg, image/png" class="w-full p-2 border border-gray-300 rounded-lg">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">AWB Number *</label>
+            <input type="text" id="swal-awb-number" value="${leadObj.awbNumber || ''}" placeholder="Enter AWB or Tracking Number" class="w-full p-2 border border-gray-300 rounded-lg">
+          </div>
+        </div>
+      `,
       showCancelButton: true,
-      confirmButtonText: 'Upload',
+      confirmButtonText: isEdit ? 'Update' : 'Upload',
       confirmButtonColor: '#2563EB',
+      showLoaderOnConfirm: true,
+      preConfirm: async () => {
+        const fileInput = document.getElementById('swal-invoice-file');
+        const awbInput = document.getElementById('swal-awb-number');
+        const file = fileInput?.files[0];
+        const awbNumber = awbInput?.value?.trim();
+
+        if (!file && !isEdit) {
+          Swal.showValidationMessage('Please select an invoice file');
+          return false;
+        }
+        if (!awbNumber) {
+          Swal.showValidationMessage('Please enter the AWB / Tracking Number');
+          return false;
+        }
+        
+        const formData = new FormData();
+        if (file) {
+          formData.append('invoice', file);
+        }
+        formData.append('awbNumber', awbNumber);
+        
+        try {
+          const res = await axios.put(`${import.meta.env.VITE_API_BASE_URL}/accounts/leads/${id}/invoice`, formData, {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data'
+            }
+          });
+          return res.data;
+        } catch (error) {
+          Swal.showValidationMessage(`Upload failed: ${error.response?.data?.message || error.message}`);
+        }
+      },
+      allowOutsideClick: () => !Swal.isLoading()
     });
 
-    if (file) {
-      setActionLoading(true);
-      try {
-        const formData = new FormData();
-        formData.append('invoice', file);
-        const res = await axios.put(`${import.meta.env.VITE_API_BASE_URL}/accounts/leads/${id}/invoice`, formData, {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-        if (res.data.status === 'success') {
-          Swal.fire('Uploaded!', 'Invoice has been uploaded successfully.', 'success');
-          updateLeadInState(res.data.data.lead);
-        }
-      } catch (error) {
-        Swal.fire('Error', error.response?.data?.message || 'Failed to upload invoice', 'error');
-      } finally {
-        setActionLoading(false);
-      }
+    if (uploadResponse && uploadResponse.status === 'success') {
+      Swal.fire('Success', isEdit ? 'Invoice & AWB updated successfully!' : 'Invoice uploaded successfully!', 'success');
+      updateLeadInState(uploadResponse.data.lead);
     }
   };
 
@@ -446,8 +472,8 @@ export default function LeadManagement() {
                               </button>
 
                               {lead.verificationStatus === 'verified' && (
-                                <button onClick={() => { setOpenDropdownId(null); handleInvoiceUpload(lead._id); }} className="group flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                  <FileText size={14} className="mr-2 text-gray-400" /> {lead.invoiceUrl ? 'Update Invoice' : 'Upload Invoice'}
+                                <button onClick={() => { setOpenDropdownId(null); handleInvoiceUpload(lead._id, lead); }} className="group flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                  <FileText size={14} className="mr-2 text-gray-400" /> {lead.invoiceUrl ? 'Edit Invoice & AWB' : 'Upload Invoice & AWB'}
                                 </button>
                               )}
                             </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UploadCloud, FileText, CheckCircle, X, Search, Calendar, User, IndianRupee } from 'lucide-react';
+import { UploadCloud, FileText, CheckCircle, X, Search, Calendar, User, IndianRupee, Edit } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
@@ -9,6 +9,7 @@ export default function UploadInvoice() {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [leadId, setLeadId] = useState('');
+  const [awbNumber, setAwbNumber] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   
   const [recentInvoices, setRecentInvoices] = useState([]);
@@ -35,7 +36,8 @@ export default function UploadInvoice() {
             amount: lead.dealValue || 0,
             date: new Date(lead.updatedAt).toLocaleDateString(),
             status: 'Verified',
-            url: lead.invoiceUrl
+            url: lead.invoiceUrl,
+            awbNumber: lead.awbNumber || ''
           }));
         setRecentInvoices(invoices);
 
@@ -45,7 +47,8 @@ export default function UploadInvoice() {
           .map(lead => ({
             id: lead._id,
             client: lead.name,
-            amount: lead.dealValue || 0
+            amount: lead.dealValue || 0,
+            awbNumber: lead.awbNumber || ''
           }));
         setPendingLeads(pending);
       }
@@ -92,7 +95,11 @@ export default function UploadInvoice() {
     e.preventDefault();
     
     if (!leadId.trim()) {
-      Swal.fire('Error', 'Please enter a valid Lead ID', 'error');
+      Swal.fire('Error', 'Please select a valid Lead', 'error');
+      return;
+    }
+    if (!awbNumber.trim()) {
+      Swal.fire('Error', 'Please enter the AWB / Tracking Number', 'error');
       return;
     }
     if (!selectedFile) {
@@ -103,6 +110,7 @@ export default function UploadInvoice() {
     setIsUploading(true);
     const formData = new FormData();
     formData.append('invoice', selectedFile);
+    formData.append('awbNumber', awbNumber.trim());
 
     try {
       const response = await axios.put(
@@ -117,9 +125,10 @@ export default function UploadInvoice() {
       );
 
       if (response.data.status === 'success') {
-        Swal.fire('Success!', 'Invoice uploaded successfully', 'success');
+        Swal.fire('Success!', 'Invoice & AWB uploaded successfully', 'success');
         setSelectedFile(null);
         setLeadId('');
+        setAwbNumber('');
         fetchData(); // Refresh both lists after successful upload
       } else {
         Swal.fire('Error', 'Failed to upload invoice', 'error');
@@ -129,6 +138,67 @@ export default function UploadInvoice() {
       Swal.fire('Error', error.response?.data?.message || 'An error occurred while uploading', 'error');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleEditInvoice = async (inv) => {
+    const { value: uploadResponse } = await Swal.fire({
+      title: 'Edit Invoice & AWB',
+      html: `
+        <div class="space-y-4 text-left px-2 mt-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Invoice Document (Optional for replacement)</label>
+            <input type="file" id="swal-invoice-file" accept="application/pdf, image/jpeg, image/png" class="w-full p-2 border border-gray-300 rounded-lg">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">AWB Number *</label>
+            <input type="text" id="swal-awb-number" value="${inv.awbNumber || ''}" placeholder="Enter AWB or Tracking Number" class="w-full p-2 border border-gray-300 rounded-lg">
+          </div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Update',
+      confirmButtonColor: '#2563EB',
+      showLoaderOnConfirm: true,
+      preConfirm: async () => {
+        const fileInput = document.getElementById('swal-invoice-file');
+        const awbInput = document.getElementById('swal-awb-number');
+        const file = fileInput?.files[0];
+        const editAwb = awbInput?.value?.trim();
+
+        if (!editAwb) {
+          Swal.showValidationMessage('Please enter the AWB / Tracking Number');
+          return false;
+        }
+        
+        const formData = new FormData();
+        if (file) {
+          formData.append('invoice', file);
+        }
+        formData.append('awbNumber', editAwb);
+        
+        try {
+          const response = await axios.put(
+            `${import.meta.env.VITE_API_BASE_URL}/accounts/leads/${inv.id}/invoice`, 
+            formData, 
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+                Authorization: `Bearer ${token}`
+              }
+            }
+          );
+          return response.data;
+        } catch (error) {
+          Swal.showValidationMessage(`Update failed: ${error.response?.data?.message || error.message}`);
+        }
+      },
+      allowOutsideClick: () => !Swal.isLoading()
+    });
+
+    if (uploadResponse && uploadResponse.status === 'success') {
+      Swal.fire('Success', 'Invoice & AWB updated successfully!', 'success');
+      fetchData();
     }
   };
 
@@ -173,6 +243,18 @@ export default function UploadInvoice() {
                 {pendingLeads.length > 0 && (
                   <p className="text-xs text-gray-500 mt-1">Select from {pendingLeads.length} leads waiting for an invoice.</p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">AWB / Tracking Number *</label>
+                <input 
+                  type="text"
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                  placeholder="Enter AWB or Tracking Number..."
+                  value={awbNumber}
+                  onChange={(e) => setAwbNumber(e.target.value)}
+                  required
+                />
               </div>
 
               <div className="pt-2">
@@ -223,7 +305,7 @@ export default function UploadInvoice() {
                 className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors mt-4 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
               >
                 {isUploading ? <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div> : null}
-                {isUploading ? 'Uploading...' : 'Submit Invoice'}
+                {isUploading ? 'Uploading...' : 'Submit Invoice & AWB'}
               </button>
             </form>
           </div>
@@ -252,22 +334,23 @@ export default function UploadInvoice() {
                   <tr className="text-gray-500 text-sm border-b border-gray-100">
                     <th className="p-4 font-medium">Lead ID</th>
                     <th className="p-4 font-medium">Client</th>
+                    <th className="p-4 font-medium">AWB Number</th>
                     <th className="p-4 font-medium">Amount</th>
                     <th className="p-4 font-medium">Upload Date</th>
-                    <th className="p-4 font-medium">Status</th>
+                    <th className="p-4 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {loading ? (
                     <tr>
-                      <td colSpan="5" className="p-8 text-center text-gray-500">
+                      <td colSpan="6" className="p-8 text-center text-gray-500">
                         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
                         Loading invoices...
                       </td>
                     </tr>
                   ) : recentInvoices.filter(inv => inv.client.toLowerCase().includes(searchTerm.toLowerCase()) || inv.id.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 ? (
                     <tr>
-                      <td colSpan="5" className="p-8 text-center text-gray-500">
+                      <td colSpan="6" className="p-8 text-center text-gray-500">
                         No uploaded invoices found.
                       </td>
                     </tr>
@@ -291,12 +374,16 @@ export default function UploadInvoice() {
                           </div>
                         </td>
                         <td className="p-4 text-sm text-gray-800 font-medium">{inv.client}</td>
+                        <td className="p-4 text-sm text-indigo-600 font-semibold">{inv.awbNumber || 'N/A'}</td>
                         <td className="p-4 font-semibold text-gray-800">₹{inv.amount.toLocaleString()}</td>
                         <td className="p-4 text-sm text-gray-500">{inv.date}</td>
-                        <td className="p-4">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border bg-green-100 text-green-800 border-green-200">
-                            {inv.status}
-                          </span>
+                        <td className="p-4 text-right">
+                          <button
+                            onClick={() => handleEditInvoice(inv)}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg transition-colors inline-flex items-center gap-1"
+                          >
+                            <Edit size={12} /> Edit
+                          </button>
                         </td>
                       </tr>
                     ))
