@@ -30,11 +30,12 @@ const StatCard = ({ title, value, icon: Icon, colorClass, onClick }) => (
 const COLORS = ['#F59E0B', '#3B82F6', '#10B981']; // Pending, Partial, Completed
 
 export default function Dashboard() {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isAuthError, setIsAuthError] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -52,7 +53,12 @@ export default function Dashboard() {
         }
       } catch (err) {
         console.error(err);
-        setError('An error occurred while fetching data');
+        if (err.response?.status === 401) {
+          setIsAuthError(true);
+          setError('Session expired. Please login again.');
+        } else {
+          setError('An error occurred while fetching data');
+        }
       } finally {
         setLoading(false);
       }
@@ -73,8 +79,16 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="bg-red-50 text-red-600 p-4 rounded-lg">
-        {error}
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+          {error}
+        </div>
+        {isAuthError && (
+          <button onClick={logout}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-red-600 text-white hover:bg-red-700 transition-all shadow-sm">
+            Logout
+          </button>
+        )}
       </div>
     );
   }
