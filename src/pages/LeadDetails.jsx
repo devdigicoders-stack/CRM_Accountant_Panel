@@ -460,7 +460,14 @@ export default function LeadDetails() {
             <h3 className="text-lg font-semibold text-gray-800 border-b pb-4 mb-4">Sale Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-gray-500 font-medium mb-1">Product / Requirement</p>
+                {lead.productId && (
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm">
+                    <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Catalog Product</p>
+                    <p className="font-bold text-gray-800">{lead.productId.name} (SKU: {lead.productId.sku})</p>
+                    <p className="text-xs text-gray-600 mt-0.5">Quantity Sold: {lead.productQuantity || 1}</p>
+                  </div>
+                )}
+                <p className="text-sm text-gray-500 font-medium mb-1">Product Details / Requirement</p>
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 text-gray-800 text-sm">
                   {lead.productDetails || 'No details provided'}
                 </div>
