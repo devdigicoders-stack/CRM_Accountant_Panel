@@ -28,6 +28,25 @@ export const AuthProvider = ({ children }) => {
 
     if (savedToken) {
       setToken(savedToken);
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001/api/v1";
+      fetch(`${baseUrl}/profile`, {
+        headers: { Authorization: `Bearer ${savedToken}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status !== "success") {
+            setUser(null);
+            setToken(null);
+            localStorage.removeItem(USER_KEY);
+            localStorage.removeItem(TOKEN_KEY);
+          }
+        })
+        .catch(() => {
+          setUser(null);
+          setToken(null);
+          localStorage.removeItem(USER_KEY);
+          localStorage.removeItem(TOKEN_KEY);
+        });
     }
 
     setLoading(false);
