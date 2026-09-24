@@ -5,7 +5,7 @@ import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
 
 export default function ChangePassword() {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const [showOld, setShowOld] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -36,11 +36,13 @@ export default function ChangePassword() {
       );
 
       if (response.data.status === 'success') {
-        Swal.fire('Success', 'Password updated successfully!', 'success');
+        Swal.fire('Success', 'Password updated successfully! Logging out...', 'success');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
-        // Optional: logout the user if backend doesn't issue a new token
+        setTimeout(() => {
+          if (logout) logout();
+        }, 1200);
       }
     } catch (error) {
       Swal.fire('Error', error.response?.data?.message || 'Failed to update password', 'error');
