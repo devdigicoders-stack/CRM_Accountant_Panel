@@ -7,7 +7,7 @@ import Swal from 'sweetalert2';
 import { 
   User, Mail, Phone, MapPin, Briefcase, Calendar, 
   MessageSquare, CheckCircle, Clock, XCircle, ArrowLeft,
-  ExternalLink, CreditCard, FileText, Edit
+  ExternalLink, CreditCard, FileText, Edit, Truck
 } from 'lucide-react';
 
 const getStatusColor = (status) => {
@@ -227,31 +227,84 @@ export default function LeadDetails() {
   };
 
   const handleTransferToInstallation = async () => {
-    const confirm = await Swal.fire({
-      title: 'Transfer to Installation?',
-      text: 'Are you sure you want to transfer this verified lead to the Installation team?',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Transfer',
-      confirmButtonColor: '#10B981',
-      cancelButtonText: 'Cancel'
-    });
-
-    if (confirm.isConfirmed) {
+    try {
       setActionLoading(true);
-      try {
-        const response = await axios.put(`${import.meta.env.VITE_API_BASE_URL}/accounts/leads/${id}/transfer`, {}, {
+      const whRes = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/stock/warehouses`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const warehouses = (whRes.data?.data || []).filter(w => w.status === 'active');
+      
+      if (!warehouses || warehouses.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Active Warehouses',
+          text: 'No active warehouse found in Stock Panel. Please create or activate a warehouse first.',
+        });
+        return;
+      }
+
+      // Build HTML for modal
+      const optionsHtml = warehouses.map(w => 
+        `<option value="${w._id}">${w.name} (${w.code || w.city || 'WH'})${w.city ? ` - ${w.city}` : ''}</option>`
+      ).join('');
+
+      let itemsSummaryHtml = '';
+      if (lead.items && lead.items.length > 0) {
+        itemsSummaryHtml = lead.items.map(it => `• <b>${it.name || it.productId?.name || 'Item'}</b> (Qty: ${it.quantity || 1})`).join('<br/>');
+      } else if (lead.productId) {
+        itemsSummaryHtml = `• <b>${lead.productId.name || 'Product'}</b> (Qty: ${lead.productQuantity || 1})`;
+      }
+
+      const { value: formValues } = await Swal.fire({
+        title: '🚚 Dispatch & Stock Out',
+        html: `
+          <div style="text-align: left; font-size: 14px;">
+            <p style="margin-bottom: 10px; color: #4b5563;">Select the warehouse from which the product(s) will be out and dispatched for <b>${lead.name}</b>:</p>
+            ${itemsSummaryHtml ? `
+            <div style="background: #f3f4f6; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; border: 1px solid #e5e7eb;">
+              <span style="font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase;">Items to Out:</span><br/>
+              ${itemsSummaryHtml}
+            </div>` : ''}
+            <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #374151;">Select Dispatch Warehouse *</label>
+            <select id="swal-wh-select" class="swal2-select" style="width: 100%; margin: 0 0 12px 0; padding: 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 14px;">
+              <option value="">-- Choose Warehouse --</option>
+              ${optionsHtml}
+            </select>
+            <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #374151;">Transport / Dispatch Instructions (Optional)</label>
+            <textarea id="swal-dispatch-remarks" class="swal2-textarea" placeholder="E.g., Fragile handling, Fast courier, Specific packaging..." style="width: 100%; height: 70px; margin: 0; padding: 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px;"></textarea>
+          </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Confirm & Transfer',
+        confirmButtonColor: '#10B981',
+        cancelButtonText: 'Cancel',
+        preConfirm: () => {
+          const warehouseId = document.getElementById('swal-wh-select').value;
+          const remarks = document.getElementById('swal-dispatch-remarks').value;
+          if (!warehouseId) {
+            Swal.showValidationMessage('Please select a dispatch warehouse!');
+            return false;
+          }
+          return { warehouseId, remarks };
+        }
+      });
+
+      if (formValues && formValues.warehouseId) {
+        setActionLoading(true);
+        const response = await axios.put(`${import.meta.env.VITE_API_BASE_URL}/accounts/leads/${id}/transfer`, formValues, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (response.data.status === 'success') {
-          Swal.fire('Success', 'Lead successfully transferred to Installation Team.', 'success');
+          Swal.fire('Success', 'Stock successfully deducted and lead transferred to Transport / Installation Team.', 'success');
           setLead(response.data.data.lead);
         }
-      } catch (error) {
-        Swal.fire('Error', error.response?.data?.message || 'Failed to transfer lead', 'error');
-      } finally {
-        setActionLoading(false);
       }
+    } catch (error) {
+      console.error(error);
+      Swal.fire('Error', error.response?.data?.message || 'Failed to transfer lead', 'error');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -490,6 +543,23 @@ export default function LeadDetails() {
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 text-gray-800 text-sm">
                   {lead.productDetails || 'No details provided'}
                 </div>
+
+                {lead.dispatchWarehouse && (
+                  <div className="mt-3 p-3 bg-purple-50 rounded-lg border border-purple-200 text-sm">
+                    <div className="flex items-center gap-2 text-purple-900 font-semibold mb-1">
+                      <Truck size={16} className="text-purple-600" />
+                      <span>Dispatch Warehouse: {lead.dispatchWarehouse.name} {lead.dispatchWarehouse.code ? `(${lead.dispatchWarehouse.code})` : ''}</span>
+                    </div>
+                    {lead.dispatchWarehouse.city && (
+                      <p className="text-xs text-purple-700 ml-6">City / Location: {lead.dispatchWarehouse.city}</p>
+                    )}
+                    {lead.dispatchRemarks && (
+                      <p className="text-xs text-purple-800 mt-1 ml-6 bg-purple-100/70 px-2 py-0.5 rounded inline-block">
+                        Note: {lead.dispatchRemarks}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
                 <div>
@@ -692,11 +762,11 @@ export default function LeadDetails() {
                 {lead.verificationStatus === 'verified' && !lead.transferredToInstallation && (
                   <button
                     disabled={actionLoading}
-                    className="w-full mt-2 py-2.5 bg-green-600 text-white font-semibold rounded-lg shadow-sm hover:bg-green-700 hover:shadow-md transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+                    className="w-full mt-2 py-2.5 bg-emerald-600 text-white font-semibold rounded-lg shadow-sm hover:bg-emerald-700 hover:shadow-md transition-all disabled:opacity-50 flex justify-center items-center gap-2"
                     onClick={handleTransferToInstallation}
                   >
-                    <CheckCircle size={20} />
-                    Transfer to Installation
+                    <Truck size={20} />
+                    Select Warehouse & Out Stock
                   </button>
                 )}
                 {lead.transferredToInstallation && (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, MoreVertical, Mail, Phone, User, CheckCircle, XCircle, FileText, CreditCard, ExternalLink } from 'lucide-react';
+import { Search, MoreVertical, Mail, Phone, User, CheckCircle, XCircle, FileText, CreditCard, ExternalLink, Truck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Swal from 'sweetalert2';
@@ -233,31 +233,85 @@ export default function LeadManagement() {
   };
 
   const handleTransferToInstallation = async (id) => {
-    const result = await Swal.fire({
-      title: 'Transfer to Installation?',
-      text: "This will move the lead to the installation team queue.",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#10b981',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, transfer it!'
-    });
-
-    if (result.isConfirmed) {
+    const targetLead = leads.find(l => l._id === id);
+    try {
       setActionLoading(true);
-      try {
-        const res = await axios.put(`${import.meta.env.VITE_API_BASE_URL}/accounts/leads/${id}/transfer`, {}, {
+      const whRes = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/stock/warehouses`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const warehouses = (whRes.data?.data || []).filter(w => w.status === 'active');
+      
+      if (!warehouses || warehouses.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Active Warehouses',
+          text: 'No active warehouse found in Stock Panel. Please create or activate a warehouse first.',
+        });
+        return;
+      }
+
+      // Build HTML for modal
+      const optionsHtml = warehouses.map(w => 
+        `<option value="${w._id}">${w.name} (${w.code || w.city || 'WH'})${w.city ? ` - ${w.city}` : ''}</option>`
+      ).join('');
+
+      let itemsSummaryHtml = '';
+      if (targetLead?.items && targetLead.items.length > 0) {
+        itemsSummaryHtml = targetLead.items.map(it => `• <b>${it.name || it.productId?.name || 'Item'}</b> (Qty: ${it.quantity || 1})`).join('<br/>');
+      } else if (targetLead?.productId) {
+        itemsSummaryHtml = `• <b>${targetLead.productId.name || 'Product'}</b> (Qty: ${targetLead.productQuantity || 1})`;
+      }
+
+      const { value: formValues } = await Swal.fire({
+        title: '🚚 Dispatch & Stock Out',
+        html: `
+          <div style="text-align: left; font-size: 14px;">
+            <p style="margin-bottom: 10px; color: #4b5563;">Select warehouse to deduct stock and transfer <b>${targetLead?.name || 'Lead'}</b> to Transport/Installation:</p>
+            ${itemsSummaryHtml ? `
+            <div style="background: #f3f4f6; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; border: 1px solid #e5e7eb;">
+              <span style="font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase;">Items to Out:</span><br/>
+              ${itemsSummaryHtml}
+            </div>` : ''}
+            <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #374151;">Select Dispatch Warehouse *</label>
+            <select id="swal-wh-select" class="swal2-select" style="width: 100%; margin: 0 0 12px 0; padding: 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 14px;">
+              <option value="">-- Choose Warehouse --</option>
+              ${optionsHtml}
+            </select>
+            <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #374151;">Transport Instructions (Optional)</label>
+            <textarea id="swal-dispatch-remarks" class="swal2-textarea" placeholder="E.g., Fragile handling, Urgent dispatch..." style="width: 100%; height: 70px; margin: 0; padding: 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px;"></textarea>
+          </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Confirm & Transfer',
+        confirmButtonColor: '#10B981',
+        cancelButtonText: 'Cancel',
+        preConfirm: () => {
+          const warehouseId = document.getElementById('swal-wh-select').value;
+          const remarks = document.getElementById('swal-dispatch-remarks').value;
+          if (!warehouseId) {
+            Swal.showValidationMessage('Please select a dispatch warehouse!');
+            return false;
+          }
+          return { warehouseId, remarks };
+        }
+      });
+
+      if (formValues && formValues.warehouseId) {
+        setActionLoading(true);
+        const res = await axios.put(`${import.meta.env.VITE_API_BASE_URL}/accounts/leads/${id}/transfer`, formValues, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.data.status === 'success') {
-          Swal.fire('Transferred!', 'Lead transferred to Installation.', 'success');
+          Swal.fire('Transferred!', 'Stock deducted and lead transferred to Transport/Installation Team.', 'success');
           updateLeadInState(res.data.data.lead);
         }
-      } catch (error) {
-        Swal.fire('Error', error.response?.data?.message || 'Failed to transfer lead', 'error');
-      } finally {
-        setActionLoading(false);
       }
+    } catch (error) {
+      console.error(error);
+      Swal.fire('Error', error.response?.data?.message || 'Failed to transfer lead', 'error');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -480,8 +534,8 @@ export default function LeadManagement() {
                             
                             {(lead.verificationStatus === 'verified' && !lead.transferredToInstallation) && (
                               <div className="py-1">
-                                <button onClick={() => { setOpenDropdownId(null); handleTransferToInstallation(lead._id); }} className="group flex w-full items-center px-4 py-2 text-sm text-blue-600 hover:bg-blue-50">
-                                  <ExternalLink size={14} className="mr-2" /> Transfer to Install
+                                <button onClick={() => { setOpenDropdownId(null); handleTransferToInstallation(lead._id); }} className="group flex w-full items-center px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50">
+                                  <Truck size={14} className="mr-2" /> Select Warehouse & Out Stock
                                 </button>
                               </div>
                             )}
