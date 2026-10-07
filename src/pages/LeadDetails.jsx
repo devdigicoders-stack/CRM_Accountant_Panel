@@ -460,13 +460,32 @@ export default function LeadDetails() {
             <h3 className="text-lg font-semibold text-gray-800 border-b pb-4 mb-4">Sale Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                {lead.productId && (
+                {lead.items && lead.items.length > 0 ? (
+                  <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200 text-sm">
+                    <p className="text-xs text-amber-700 font-bold uppercase tracking-wider mb-2">
+                      Confirmed Products ({lead.items.length} {lead.items.length === 1 ? 'Item' : 'Items'})
+                    </p>
+                    <div className="space-y-1.5">
+                      {lead.items.map((it, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-xs bg-white/80 p-2 rounded border border-amber-100">
+                          <div>
+                            <span className="font-bold text-gray-900">{it.name || it.productId?.name || `Item ${idx + 1}`}</span>
+                            <span className="text-gray-500 ml-2">Qty: {it.quantity || 1} {it.price ? `(₹${it.price.toLocaleString()})` : ''}</span>
+                          </div>
+                          {it.price > 0 && (
+                            <span className="font-bold text-amber-600">₹{((it.price || 0) * (it.quantity || 1)).toLocaleString()}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : lead.productId ? (
                   <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm">
                     <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Catalog Product</p>
                     <p className="font-bold text-gray-800">{lead.productId.name} (SKU: {lead.productId.sku})</p>
                     <p className="text-xs text-gray-600 mt-0.5">Quantity Sold: {lead.productQuantity || 1}</p>
                   </div>
-                )}
+                ) : null}
                 <p className="text-sm text-gray-500 font-medium mb-1">Product Details / Requirement</p>
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 text-gray-800 text-sm">
                   {lead.productDetails || 'No details provided'}
