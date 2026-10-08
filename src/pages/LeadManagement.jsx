@@ -250,35 +250,65 @@ export default function LeadManagement() {
         return;
       }
 
-      // Build HTML for modal
+      // Build options
       const optionsHtml = warehouses.map(w => 
         `<option value="${w._id}">${w.name} (${w.code || w.city || 'WH'})${w.city ? ` - ${w.city}` : ''}</option>`
       ).join('');
 
-      let itemsSummaryHtml = '';
-      if (targetLead?.items && targetLead.items.length > 0) {
-        itemsSummaryHtml = targetLead.items.map(it => `• <b>${it.name || it.productId?.name || 'Item'}</b> (Qty: ${it.quantity || 1})`).join('<br/>');
-      } else if (targetLead?.productId) {
-        itemsSummaryHtml = `• <b>${targetLead.productId.name || 'Product'}</b> (Qty: ${targetLead.productQuantity || 1})`;
+      const rawItems = (targetLead?.items && targetLead.items.length > 0) 
+        ? targetLead.items 
+        : (targetLead?.productId ? [{ name: targetLead.productId.name || 'Product', quantity: targetLead.productQuantity || 1, productId: targetLead.productId }] : []);
+
+      let itemsHtml = '';
+      if (rawItems.length > 0) {
+        itemsHtml = rawItems.map((it, idx) => `
+          <div style="background: #ffffff; padding: 10px 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; color: #1e293b; font-size: 13px;">${it.name || it.productId?.name || `Item #${idx + 1}`}</span>
+              <span style="background: #eff6ff; color: #1d4ed8; font-weight: 800; font-size: 11px; padding: 2px 8px; border-radius: 9999px; border: 1px solid #bfdbfe;">Qty: ${it.quantity || 1}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 11px; font-weight: 600; color: #64748b; white-space: nowrap;">Warehouse *:</span>
+              <select id="swal-item-wh-${idx}" class="swal-item-wh-select" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 600; color: #0f172a; background-color: #f8fafc;">
+                <option value="">-- Select Warehouse for this Product --</option>
+                ${optionsHtml}
+              </select>
+            </div>
+          </div>
+        `).join('');
       }
 
       const { value: formValues } = await Swal.fire({
         title: '🚚 Dispatch & Stock Out',
+        width: '560px',
         html: `
-          <div style="text-align: left; font-size: 14px;">
-            <p style="margin-bottom: 10px; color: #4b5563;">Select warehouse to deduct stock and transfer <b>${targetLead?.name || 'Lead'}</b> to Transport/Installation:</p>
-            ${itemsSummaryHtml ? `
-            <div style="background: #f3f4f6; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; border: 1px solid #e5e7eb;">
-              <span style="font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase;">Items to Out:</span><br/>
-              ${itemsSummaryHtml}
+          <div style="text-align: left; font-size: 13px;">
+            <p style="margin-bottom: 12px; color: #475569; font-size: 13px;">
+              Select the warehouse for each product to dispatch for <b>${targetLead?.name || 'Lead'}</b>. Stock records will be maintained in the Stock Panel upon SuperAdmin approval:
+            </p>
+
+            ${rawItems.length > 1 ? `
+            <div style="background: #f1f5f9; padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #cbd5e1;">
+              <label style="display: block; font-weight: 700; font-size: 11px; text-transform: uppercase; color: #475569; margin-bottom: 4px;">
+                ⚡ Quick Select: Apply Same Warehouse to All Products
+              </label>
+              <select id="swal-master-wh" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 12px; font-weight: 600; color: #0f172a; background: #fff;">
+                <option value="">-- Apply to All Products --</option>
+                ${optionsHtml}
+              </select>
             </div>` : ''}
-            <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #374151;">Select Dispatch Warehouse *</label>
-            <select id="swal-wh-select" class="swal2-select" style="width: 100%; margin: 0 0 12px 0; padding: 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 14px;">
-              <option value="">-- Choose Warehouse --</option>
-              ${optionsHtml}
-            </select>
-            <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #374151;">Transport Instructions (Optional)</label>
-            <textarea id="swal-dispatch-remarks" class="swal2-textarea" placeholder="E.g., Fragile handling, Urgent dispatch..." style="width: 100%; height: 70px; margin: 0; padding: 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px;"></textarea>
+
+            <div style="margin-bottom: 12px;">
+              <label style="display: block; font-weight: 700; font-size: 12px; color: #334155; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                Products & Selected Warehouses (${rawItems.length} items):
+              </label>
+              <div style="max-height: 240px; overflow-y: auto; padding-right: 2px;">
+                ${itemsHtml}
+              </div>
+            </div>
+
+            <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #334155; font-size: 12px;">Transport / Dispatch Instructions (Optional)</label>
+            <textarea id="swal-dispatch-remarks" placeholder="E.g., Fragile handling, Urgent dispatch..." style="width: 100%; height: 60px; margin: 0; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px; box-sizing: border-box;"></textarea>
           </div>
         `,
         focusConfirm: false,
@@ -286,14 +316,45 @@ export default function LeadManagement() {
         confirmButtonText: 'Confirm & Transfer',
         confirmButtonColor: '#10B981',
         cancelButtonText: 'Cancel',
+        didOpen: () => {
+          const masterSelect = document.getElementById('swal-master-wh');
+          if (masterSelect) {
+            masterSelect.addEventListener('change', (e) => {
+              const val = e.target.value;
+              if (val) {
+                const itemSelects = document.querySelectorAll('.swal-item-wh-select');
+                itemSelects.forEach(sel => { sel.value = val; });
+              }
+            });
+          }
+        },
         preConfirm: () => {
-          const warehouseId = document.getElementById('swal-wh-select').value;
-          const remarks = document.getElementById('swal-dispatch-remarks').value;
-          if (!warehouseId) {
-            Swal.showValidationMessage('Please select a dispatch warehouse!');
+          const itemWarehouses = {};
+          let missingItem = null;
+          let primaryWarehouseId = '';
+
+          for (let i = 0; i < rawItems.length; i++) {
+            const el = document.getElementById(`swal-item-wh-${i}`);
+            const whVal = el ? el.value : '';
+            if (!whVal) {
+              missingItem = rawItems[i].name || `Item #${i + 1}`;
+              break;
+            }
+            itemWarehouses[i] = whVal;
+            if (rawItems[i].productId?._id || rawItems[i].productId) {
+              const pId = (rawItems[i].productId._id || rawItems[i].productId).toString();
+              itemWarehouses[pId] = whVal;
+            }
+            if (!primaryWarehouseId) primaryWarehouseId = whVal;
+          }
+
+          if (missingItem) {
+            Swal.showValidationMessage(`Please choose a warehouse for "${missingItem}"!`);
             return false;
           }
-          return { warehouseId, remarks };
+
+          const remarks = document.getElementById('swal-dispatch-remarks')?.value || '';
+          return { warehouseId: primaryWarehouseId, itemWarehouses, remarks };
         }
       });
 
@@ -303,13 +364,13 @@ export default function LeadManagement() {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.data.status === 'success') {
-          Swal.fire('Transferred!', 'Stock deducted and lead transferred to Transport/Installation Team.', 'success');
+          Swal.fire('Request Submitted!', 'Transfer request sent to SuperAdmin for approval. Stock records will be maintained in the Stock Panel once approved.', 'success');
           updateLeadInState(res.data.data.lead);
         }
       }
     } catch (error) {
       console.error(error);
-      Swal.fire('Error', error.response?.data?.message || 'Failed to transfer lead', 'error');
+      Swal.fire('Error', error.response?.data?.message || 'Failed to submit transfer request', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -482,8 +543,16 @@ export default function LeadManagement() {
                     </td>
                     <td className="p-4">
                       {lead.transferredToInstallation ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold border bg-teal-50 text-teal-700 border-teal-200 tracking-wide uppercase" title="Installation Status">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold border bg-teal-50 text-teal-700 border-teal-200 tracking-wide uppercase" title="Transferred to Transport/Installation">
                           TRANSFERRED
+                        </span>
+                      ) : lead.transferApprovalStatus === 'pending' ? (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold border bg-amber-50 text-amber-700 border-amber-300 tracking-wide uppercase animate-pulse" title="Transfer request is pending SuperAdmin approval">
+                          PENDING APPROVAL
+                        </span>
+                      ) : lead.transferApprovalStatus === 'rejected' ? (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold border bg-rose-50 text-rose-700 border-rose-300 tracking-wide uppercase" title={`Transfer Rejected: ${lead.transferRejectionRemarks || 'Reason not specified'}`}>
+                          TRANSFER REJECTED
                         </span>
                       ) : (
                         <span className="text-xs text-gray-400 font-medium">NOT TRANSFERRED</span>
@@ -508,7 +577,7 @@ export default function LeadManagement() {
                         </div>
 
                         {openDropdownId === lead._id && (
-                          <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 divide-y divide-gray-100">
+                          <div className="absolute right-0 mt-2 w-52 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 divide-y divide-gray-100">
                             <div className="py-1">
                               {lead.verificationStatus === 'pending' && (
                                 <>
@@ -534,9 +603,19 @@ export default function LeadManagement() {
                             
                             {(lead.verificationStatus === 'verified' && !lead.transferredToInstallation) && (
                               <div className="py-1">
-                                <button onClick={() => { setOpenDropdownId(null); handleTransferToInstallation(lead._id); }} className="group flex w-full items-center px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50">
-                                  <Truck size={14} className="mr-2" /> Select Warehouse & Out Stock
-                                </button>
+                                {lead.transferApprovalStatus === 'pending' ? (
+                                  <button onClick={() => { setOpenDropdownId(null); Swal.fire('Pending Approval', `Transfer request is waiting for SuperAdmin approval. Selected warehouse: ${lead.dispatchWarehouse?.name || 'Warehouse'}`, 'info'); }} className="group flex w-full items-center px-4 py-2 text-sm text-amber-600 hover:bg-amber-50">
+                                    <Truck size={14} className="mr-2" /> Transfer Pending Approval...
+                                  </button>
+                                ) : lead.transferApprovalStatus === 'rejected' ? (
+                                  <button onClick={() => { setOpenDropdownId(null); handleTransferToInstallation(lead._id); }} className="group flex w-full items-center px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 font-medium">
+                                    <Truck size={14} className="mr-2" /> Re-submit Transfer Request
+                                  </button>
+                                ) : (
+                                  <button onClick={() => { setOpenDropdownId(null); handleTransferToInstallation(lead._id); }} className="group flex w-full items-center px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50">
+                                    <Truck size={14} className="mr-2" /> Request Warehouse Transfer
+                                  </button>
+                                )}
                               </div>
                             )}
 

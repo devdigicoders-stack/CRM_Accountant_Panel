@@ -243,35 +243,65 @@ export default function LeadDetails() {
         return;
       }
 
-      // Build HTML for modal
+      // Build options
       const optionsHtml = warehouses.map(w => 
         `<option value="${w._id}">${w.name} (${w.code || w.city || 'WH'})${w.city ? ` - ${w.city}` : ''}</option>`
       ).join('');
 
-      let itemsSummaryHtml = '';
-      if (lead.items && lead.items.length > 0) {
-        itemsSummaryHtml = lead.items.map(it => `• <b>${it.name || it.productId?.name || 'Item'}</b> (Qty: ${it.quantity || 1})`).join('<br/>');
-      } else if (lead.productId) {
-        itemsSummaryHtml = `• <b>${lead.productId.name || 'Product'}</b> (Qty: ${lead.productQuantity || 1})`;
+      const rawItems = (lead.items && lead.items.length > 0) 
+        ? lead.items 
+        : (lead.productId ? [{ name: lead.productId.name || 'Product', quantity: lead.productQuantity || 1, productId: lead.productId }] : []);
+
+      let itemsHtml = '';
+      if (rawItems.length > 0) {
+        itemsHtml = rawItems.map((it, idx) => `
+          <div style="background: #ffffff; padding: 10px 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; color: #1e293b; font-size: 13px;">${it.name || it.productId?.name || `Item #${idx + 1}`}</span>
+              <span style="background: #eff6ff; color: #1d4ed8; font-weight: 800; font-size: 11px; padding: 2px 8px; border-radius: 9999px; border: 1px solid #bfdbfe;">Qty: ${it.quantity || 1}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 11px; font-weight: 600; color: #64748b; white-space: nowrap;">Warehouse *:</span>
+              <select id="swal-item-wh-${idx}" class="swal-item-wh-select" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 600; color: #0f172a; background-color: #f8fafc;">
+                <option value="">-- Select Warehouse for this Product --</option>
+                ${optionsHtml}
+              </select>
+            </div>
+          </div>
+        `).join('');
       }
 
       const { value: formValues } = await Swal.fire({
         title: '🚚 Dispatch & Stock Out',
+        width: '560px',
         html: `
-          <div style="text-align: left; font-size: 14px;">
-            <p style="margin-bottom: 10px; color: #4b5563;">Select the warehouse from which the product(s) will be out and dispatched for <b>${lead.name}</b>:</p>
-            ${itemsSummaryHtml ? `
-            <div style="background: #f3f4f6; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 13px; border: 1px solid #e5e7eb;">
-              <span style="font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase;">Items to Out:</span><br/>
-              ${itemsSummaryHtml}
+          <div style="text-align: left; font-size: 13px;">
+            <p style="margin-bottom: 12px; color: #475569; font-size: 13px;">
+              Select the warehouse for each product to dispatch for <b>${lead.name}</b>. Stock records will be maintained in the Stock Panel upon SuperAdmin approval:
+            </p>
+
+            ${rawItems.length > 1 ? `
+            <div style="background: #f1f5f9; padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #cbd5e1;">
+              <label style="display: block; font-weight: 700; font-size: 11px; text-transform: uppercase; color: #475569; margin-bottom: 4px;">
+                ⚡ Quick Select: Apply Same Warehouse to All Products
+              </label>
+              <select id="swal-master-wh" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 12px; font-weight: 600; color: #0f172a; background: #fff;">
+                <option value="">-- Apply to All Products --</option>
+                ${optionsHtml}
+              </select>
             </div>` : ''}
-            <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #374151;">Select Dispatch Warehouse *</label>
-            <select id="swal-wh-select" class="swal2-select" style="width: 100%; margin: 0 0 12px 0; padding: 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 14px;">
-              <option value="">-- Choose Warehouse --</option>
-              ${optionsHtml}
-            </select>
-            <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #374151;">Transport / Dispatch Instructions (Optional)</label>
-            <textarea id="swal-dispatch-remarks" class="swal2-textarea" placeholder="E.g., Fragile handling, Fast courier, Specific packaging..." style="width: 100%; height: 70px; margin: 0; padding: 8px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 13px;"></textarea>
+
+            <div style="margin-bottom: 12px;">
+              <label style="display: block; font-weight: 700; font-size: 12px; color: #334155; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                Products & Selected Warehouses (${rawItems.length} items):
+              </label>
+              <div style="max-height: 240px; overflow-y: auto; padding-right: 2px;">
+                ${itemsHtml}
+              </div>
+            </div>
+
+            <label style="display: block; font-weight: 600; margin-bottom: 4px; color: #334155; font-size: 12px;">Transport / Dispatch Instructions (Optional)</label>
+            <textarea id="swal-dispatch-remarks" placeholder="E.g., Fragile handling, Fast courier, Specific packaging..." style="width: 100%; height: 60px; margin: 0; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px; box-sizing: border-box;"></textarea>
           </div>
         `,
         focusConfirm: false,
@@ -279,14 +309,45 @@ export default function LeadDetails() {
         confirmButtonText: 'Confirm & Transfer',
         confirmButtonColor: '#10B981',
         cancelButtonText: 'Cancel',
+        didOpen: () => {
+          const masterSelect = document.getElementById('swal-master-wh');
+          if (masterSelect) {
+            masterSelect.addEventListener('change', (e) => {
+              const val = e.target.value;
+              if (val) {
+                const itemSelects = document.querySelectorAll('.swal-item-wh-select');
+                itemSelects.forEach(sel => { sel.value = val; });
+              }
+            });
+          }
+        },
         preConfirm: () => {
-          const warehouseId = document.getElementById('swal-wh-select').value;
-          const remarks = document.getElementById('swal-dispatch-remarks').value;
-          if (!warehouseId) {
-            Swal.showValidationMessage('Please select a dispatch warehouse!');
+          const itemWarehouses = {};
+          let missingItem = null;
+          let primaryWarehouseId = '';
+
+          for (let i = 0; i < rawItems.length; i++) {
+            const el = document.getElementById(`swal-item-wh-${i}`);
+            const whVal = el ? el.value : '';
+            if (!whVal) {
+              missingItem = rawItems[i].name || `Item #${i + 1}`;
+              break;
+            }
+            itemWarehouses[i] = whVal;
+            if (rawItems[i].productId?._id || rawItems[i].productId) {
+              const pId = (rawItems[i].productId._id || rawItems[i].productId).toString();
+              itemWarehouses[pId] = whVal;
+            }
+            if (!primaryWarehouseId) primaryWarehouseId = whVal;
+          }
+
+          if (missingItem) {
+            Swal.showValidationMessage(`Please choose a warehouse for "${missingItem}"!`);
             return false;
           }
-          return { warehouseId, remarks };
+
+          const remarks = document.getElementById('swal-dispatch-remarks')?.value || '';
+          return { warehouseId: primaryWarehouseId, itemWarehouses, remarks };
         }
       });
 
@@ -296,13 +357,13 @@ export default function LeadDetails() {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (response.data.status === 'success') {
-          Swal.fire('Success', 'Stock successfully deducted and lead transferred to Transport / Installation Team.', 'success');
+          Swal.fire('Request Submitted!', 'Transfer request submitted to SuperAdmin for approval. Stock records will be maintained in the Stock Panel upon approval.', 'success');
           setLead(response.data.data.lead);
         }
       }
     } catch (error) {
       console.error(error);
-      Swal.fire('Error', error.response?.data?.message || 'Failed to transfer lead', 'error');
+      Swal.fire('Error', error.response?.data?.message || 'Failed to submit transfer request', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -760,14 +821,45 @@ export default function LeadDetails() {
                   </div>
                 )}
                 {lead.verificationStatus === 'verified' && !lead.transferredToInstallation && (
-                  <button
-                    disabled={actionLoading}
-                    className="w-full mt-2 py-2.5 bg-emerald-600 text-white font-semibold rounded-lg shadow-sm hover:bg-emerald-700 hover:shadow-md transition-all disabled:opacity-50 flex justify-center items-center gap-2"
-                    onClick={handleTransferToInstallation}
-                  >
-                    <Truck size={20} />
-                    Select Warehouse & Out Stock
-                  </button>
+                  <div>
+                    {lead.transferApprovalStatus === 'pending' ? (
+                      <div className="w-full mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-800 uppercase tracking-wide">
+                          ⏳ Transfer Pending SuperAdmin Approval
+                        </span>
+                        <p className="text-xs text-amber-600 mt-1">
+                          Dispatch warehouse: <span className="font-semibold">{lead.dispatchWarehouse?.name || 'Selected Warehouse'}</span>. Stock will be deducted upon approval.
+                        </p>
+                      </div>
+                    ) : lead.transferApprovalStatus === 'rejected' ? (
+                      <div className="w-full mt-2 p-3 bg-rose-50 border border-rose-200 rounded-lg text-left">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-800 uppercase tracking-wide">
+                          ❌ Transfer Request Rejected by SuperAdmin
+                        </span>
+                        {lead.transferRejectionRemarks && (
+                          <p className="text-xs text-rose-600 mt-1">
+                            Reason: <span className="font-medium">{lead.transferRejectionRemarks}</span>
+                          </p>
+                        )}
+                        <button
+                          disabled={actionLoading}
+                          className="w-full mt-2.5 py-2 bg-rose-600 text-white font-semibold rounded-lg shadow-sm hover:bg-rose-700 transition-all disabled:opacity-50 flex justify-center items-center gap-2 text-xs"
+                          onClick={handleTransferToInstallation}
+                        >
+                          <Truck size={16} /> Re-submit Transfer Request
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        disabled={actionLoading}
+                        className="w-full mt-2 py-2.5 bg-emerald-600 text-white font-semibold rounded-lg shadow-sm hover:bg-emerald-700 hover:shadow-md transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+                        onClick={handleTransferToInstallation}
+                      >
+                        <Truck size={20} />
+                        Request Warehouse Transfer
+                      </button>
+                    )}
+                  </div>
                 )}
                 {lead.transferredToInstallation && (
                   <div className="mt-4 pt-4 border-t border-gray-100">
