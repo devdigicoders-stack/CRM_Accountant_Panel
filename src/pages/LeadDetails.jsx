@@ -229,10 +229,17 @@ export default function LeadDetails() {
   const handleTransferToInstallation = async () => {
     try {
       setActionLoading(true);
-      const whRes = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/stock/warehouses`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const [whRes, prodRes] = await Promise.all([
+        axios.get(`${import.meta.env.VITE_API_BASE_URL}/stock/warehouses`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${import.meta.env.VITE_API_BASE_URL}/stock/products`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => ({ data: { data: [] } }))
+      ]);
+      
       const warehouses = (whRes.data?.data || []).filter(w => w.status === 'active');
+      const allProducts = prodRes.data?.data || [];
       
       if (!warehouses || warehouses.length === 0) {
         Swal.fire({
@@ -243,51 +250,92 @@ export default function LeadDetails() {
         return;
       }
 
-      // Build options
-      const optionsHtml = warehouses.map(w => 
-        `<option value="${w._id}">${w.name} (${w.code || w.city || 'WH'})${w.city ? ` - ${w.city}` : ''}</option>`
-      ).join('');
-
       const rawItems = (lead.items && lead.items.length > 0) 
         ? lead.items 
         : (lead.productId ? [{ name: lead.productId.name || 'Product', quantity: lead.productQuantity || 1, productId: lead.productId }] : []);
 
       let itemsHtml = '';
       if (rawItems.length > 0) {
-        itemsHtml = rawItems.map((it, idx) => `
-          <div style="background: #ffffff; padding: 10px 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-weight: 700; color: #1e293b; font-size: 13px;">${it.name || it.productId?.name || `Item #${idx + 1}`}</span>
-              <span style="background: #eff6ff; color: #1d4ed8; font-weight: 800; font-size: 11px; padding: 2px 8px; border-radius: 9999px; border: 1px solid #bfdbfe;">Qty: ${it.quantity || 1}</span>
+        itemsHtml = rawItems.map((it, idx) => {
+          const targetProdId = it.productId?._id || (typeof it.productId === 'string' ? it.productId : null);
+          let prodObj = allProducts.find(p => p._id?.toString() === targetProdId?.toString() || (p.name && it.name && p.name.trim().toLowerCase() === it.name.trim().toLowerCase()));
+          if (!prodObj && it.productId && typeof it.productId === 'object' && it.productId.warehouseStock) {
+            prodObj = it.productId;
+          }
+
+          const optionsHtml = warehouses.map(w => {
+            const stockEntry = (prodObj?.warehouseStock || []).find(ws => 
+              (ws.warehouse?._id?.toString() || ws.warehouse?.toString()) === w._id.toString()
+            );
+            const qty = stockEntry ? stockEntry.quantity : 0;
+            const isAvailable = qty > 0;
+            const stockBadge = isAvailable ? `[Stock: ${qty} Available]` : `[Stock: 0 - Out of Stock]`;
+            return `<option value="${w._id}" data-stock="${qty}">
+              ${w.name} (${w.code || w.city || 'WH'}) — ${stockBadge}
+            </option>`;
+          }).join('');
+
+          const stockChipsHtml = warehouses.map(w => {
+            const stockEntry = (prodObj?.warehouseStock || []).find(ws => 
+              (ws.warehouse?._id?.toString() || ws.warehouse?.toString()) === w._id.toString()
+            );
+            const qty = stockEntry ? stockEntry.quantity : 0;
+            const hasStock = qty > 0;
+            return `<span style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: ${hasStock ? '#dcfce7' : '#f1f5f9'}; color: ${hasStock ? '#15803d' : '#94a3b8'}; border: 1px solid ${hasStock ? '#86efac' : '#e2e8f0'};">
+              <span>${w.name}</span>: <b>${qty}</b>
+            </span>`;
+          }).join('');
+
+          return `
+            <div style="background: #ffffff; padding: 12px 14px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 800; color: #0f172a; font-size: 13px;">${it.name || it.productId?.name || `Item #${idx + 1}`}</span>
+                <span style="background: #eff6ff; color: #1d4ed8; font-weight: 800; font-size: 11px; padding: 2px 8px; border-radius: 9999px; border: 1px solid #bfdbfe;">Required: ${it.quantity || 1} units</span>
+              </div>
+
+              <!-- Available Stock in Warehouses -->
+              <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 2px 0;">
+                <span style="font-size: 10px; font-weight: 800; color: #64748b; margin-right: 2px;">📦 Available Stock:</span>
+                ${stockChipsHtml}
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 2px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span style="font-size: 11px; font-weight: 700; color: #475569; white-space: nowrap;">Dispatch Warehouse *:</span>
+                  <select id="swal-item-wh-${idx}" class="swal-item-wh-select" data-required="${it.quantity || 1}" style="width: 100%; padding: 7px 9px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-size: 12px; font-weight: 700; color: #0f172a; background-color: #f8fafc;">
+                    <option value="">-- Select Warehouse (Check Stock) --</option>
+                    ${optionsHtml}
+                  </select>
+                </div>
+                <div id="swal-stock-warning-${idx}" style="display: none; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 6px; margin-top: 2px;"></div>
+              </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span style="font-size: 11px; font-weight: 600; color: #64748b; white-space: nowrap;">Warehouse *:</span>
-              <select id="swal-item-wh-${idx}" class="swal-item-wh-select" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 600; color: #0f172a; background-color: #f8fafc;">
-                <option value="">-- Select Warehouse for this Product --</option>
-                ${optionsHtml}
-              </select>
-            </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       }
+
+      // Master options
+      const masterOptionsHtml = warehouses.map(w => 
+        `<option value="${w._id}">${w.name} (${w.code || w.city || 'WH'})${w.city ? ` - ${w.city}` : ''}</option>`
+      ).join('');
 
       const { value: formValues } = await Swal.fire({
         title: '🚚 Dispatch & Stock Out',
-        width: '560px',
+        width: '580px',
         html: `
           <div style="text-align: left; font-size: 13px;">
             <p style="margin-bottom: 12px; color: #475569; font-size: 13px;">
-              Select the warehouse for each product to dispatch for <b>${lead.name}</b>. Stock records will be maintained in the Stock Panel upon SuperAdmin approval:
+              Select the warehouse for each product to dispatch for <b>${lead.name}</b>. Available stock in each warehouse is shown below:
             </p>
 
             ${rawItems.length > 1 ? `
-            <div style="background: #f1f5f9; padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #cbd5e1;">
+            <div style="background: #f8fafc; padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #cbd5e1;">
               <label style="display: block; font-weight: 700; font-size: 11px; text-transform: uppercase; color: #475569; margin-bottom: 4px;">
                 ⚡ Quick Select: Apply Same Warehouse to All Products
               </label>
-              <select id="swal-master-wh" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 12px; font-weight: 600; color: #0f172a; background: #fff;">
+              <select id="swal-master-wh" style="width: 100%; padding: 7px 9px; border-radius: 6px; border: 1px solid #94a3b8; font-size: 12px; font-weight: 600; color: #0f172a; background: #fff;">
                 <option value="">-- Apply to All Products --</option>
-                ${optionsHtml}
+                ${masterOptionsHtml}
               </select>
             </div>` : ''}
 
@@ -295,7 +343,7 @@ export default function LeadDetails() {
               <label style="display: block; font-weight: 700; font-size: 12px; color: #334155; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
                 Products & Selected Warehouses (${rawItems.length} items):
               </label>
-              <div style="max-height: 240px; overflow-y: auto; padding-right: 2px;">
+              <div style="max-height: 280px; overflow-y: auto; padding-right: 2px;">
                 ${itemsHtml}
               </div>
             </div>
@@ -310,13 +358,52 @@ export default function LeadDetails() {
         confirmButtonColor: '#10B981',
         cancelButtonText: 'Cancel',
         didOpen: () => {
+          const updateWarnings = () => {
+            const itemSelects = document.querySelectorAll('.swal-item-wh-select');
+            itemSelects.forEach((sel, idx) => {
+              const selectedOpt = sel.options[sel.selectedIndex];
+              const stock = selectedOpt ? parseInt(selectedOpt.getAttribute('data-stock') || '0', 10) : 0;
+              const required = parseInt(sel.getAttribute('data-required') || '1', 10);
+              const warnEl = document.getElementById(`swal-stock-warning-${idx}`);
+              
+              if (warnEl) {
+                if (!sel.value) {
+                  warnEl.style.display = 'none';
+                } else if (stock === 0) {
+                  warnEl.style.display = 'block';
+                  warnEl.style.background = '#fef2f2';
+                  warnEl.style.color = '#dc2626';
+                  warnEl.style.border = '1px solid #fecaca';
+                  warnEl.innerHTML = '⚠️ Selected warehouse has 0 stock! SuperAdmin will need to verify stock in Stock Panel.';
+                } else if (stock < required) {
+                  warnEl.style.display = 'block';
+                  warnEl.style.background = '#fffbeb';
+                  warnEl.style.color = '#d97706';
+                  warnEl.style.border = '1px solid #fde68a';
+                  warnEl.innerHTML = `⚠️ Low stock in this warehouse (Available: ${stock}, Required: ${required}).`;
+                } else {
+                  warnEl.style.display = 'block';
+                  warnEl.style.background = '#f0fdf4';
+                  warnEl.style.color = '#16a34a';
+                  warnEl.style.border = '1px solid #bbf7d0';
+                  warnEl.innerHTML = `✓ Stock Available in this warehouse (${stock} units in stock).`;
+                }
+              }
+            });
+          };
+
+          const itemSelects = document.querySelectorAll('.swal-item-wh-select');
+          itemSelects.forEach(sel => {
+            sel.addEventListener('change', updateWarnings);
+          });
+
           const masterSelect = document.getElementById('swal-master-wh');
           if (masterSelect) {
             masterSelect.addEventListener('change', (e) => {
               const val = e.target.value;
               if (val) {
-                const itemSelects = document.querySelectorAll('.swal-item-wh-select');
                 itemSelects.forEach(sel => { sel.value = val; });
+                updateWarnings();
               }
             });
           }
