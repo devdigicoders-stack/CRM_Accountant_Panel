@@ -574,6 +574,11 @@ export default function LeadDetails() {
               <span className={`text-xs px-2.5 py-1 rounded-full border ${getStatusColor(lead.verificationStatus)}`}>
                 {lead.verificationStatus?.toUpperCase()}
               </span>
+              {lead.isBookingAmount && (
+                <span className="text-xs px-2.5 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-300 font-bold flex items-center gap-1 shadow-xs">
+                  🏷️ Booking Amount
+                </span>
+              )}
             </h1>
             <p className="text-gray-500 text-sm mt-1">Lead ID: {lead._id}</p>
           </div>
@@ -717,9 +722,21 @@ export default function LeadDetails() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 font-medium mb-1">Amount Paid</p>
-                  <div className="p-3 bg-blue-50 text-blue-800 rounded-lg border border-blue-100 font-bold text-lg flex items-center">
-                    ₹{lead.amountPaid?.toLocaleString() || 0}
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm text-gray-500 font-medium">Amount Paid</p>
+                    {lead.isBookingAmount && (
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                        🏷️ Booking Token
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-3 bg-blue-50 text-blue-800 rounded-lg border border-blue-100 font-bold text-lg flex items-center justify-between">
+                    <span>₹{lead.amountPaid?.toLocaleString() || 0}</span>
+                    {lead.isBookingAmount && (
+                      <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        Booking Amount
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -852,6 +869,17 @@ export default function LeadDetails() {
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
             <h3 className="text-lg font-semibold text-gray-800 border-b pb-4 mb-4">Verification Check</h3>
+            
+            {lead.isBookingAmount && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs">
+                <p className="font-bold flex items-center gap-1.5 text-amber-800 text-xs">
+                  <span>🏷️ Booking Amount Notice:</span>
+                </p>
+                <p className="mt-1 text-amber-700">
+                  Sales person ne is payment ko <b>Booking / Advance Amount (टोकन)</b> ke roop me switch kiya hai.
+                </p>
+              </div>
+            )}
             
             {lead.verificationStatus === 'pending' ? (
               <div className="space-y-4">

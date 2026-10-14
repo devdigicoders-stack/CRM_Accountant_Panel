@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import SalesRevenueWidget from '../components/SalesRevenueWidget';
 
 const StatCard = ({ title, value, icon: Icon, colorClass, onClick }) => (
   <div 
@@ -37,37 +38,39 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [isAuthError, setIsAuthError] = useState(false);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/accounts/dashboard`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-        
-        if (response.data.status === 'success') {
-          setData(response.data.data);
-        } else {
-          setError('Failed to fetch dashboard data');
+  const fetchDashboardData = useCallback(async () => {
+    if (!token) return;
+    try {
+      setLoading(true);
+      setError('');
+      setIsAuthError(false);
+      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/accounts/dashboard`, {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
-      } catch (err) {
-        console.error(err);
-        if (err.response?.status === 401) {
-          setIsAuthError(true);
-          setError('Session expired. Please login again.');
-        } else {
-          setError('An error occurred while fetching data');
-        }
-      } finally {
-        setLoading(false);
+      });
+      
+      if (response.data.status === 'success') {
+        setData(response.data.data);
+      } else {
+        setError('Failed to fetch dashboard data');
       }
-    };
-
-    if (token) {
-      fetchDashboardData();
+    } catch (err) {
+      console.error(err);
+      if (err.response?.status === 401) {
+        setIsAuthError(true);
+        setError('Session expired. Please login again.');
+      } else {
+        setError('An error occurred while fetching data');
+      }
+    } finally {
+      setLoading(false);
     }
   }, [token]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   if (loading) {
     return (
@@ -139,6 +142,14 @@ export default function Dashboard() {
           onClick={() => navigate('/leads-list?status=rejected')}
         />
       </div>
+
+      {/* Real-Time Sales & Revenue Count Widget */}
+      <SalesRevenueWidget
+        salesData={data?.salesRevenue}
+        baseUrl={import.meta.env.VITE_API_BASE_URL}
+        token={token}
+        onRefresh={fetchDashboardData}
+      />
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

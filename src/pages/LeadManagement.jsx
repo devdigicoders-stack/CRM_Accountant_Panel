@@ -613,6 +613,11 @@ export default function LeadManagement() {
                     <td className="p-4">
                       <div className="space-y-1">
                         <p className="font-semibold text-gray-800">₹{lead.dealValue?.toLocaleString() || 0}</p>
+                        {lead.isBookingAmount && (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                            🏷️ Booking (₹{(lead.amountPaid || lead.bookingAmount || 0).toLocaleString()})
+                          </span>
+                        )}
                         <p className="text-xs text-gray-500 truncate max-w-[200px]" title={lead.productDetails}>
                           {lead.productDetails || 'No details'}
                         </p>

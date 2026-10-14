@@ -445,14 +445,21 @@ export default function VerifySales() {
                         <p className="font-bold text-gray-800">
                           ₹{(trx.dealValue || trx.totalAmount || 0).toLocaleString()}
                         </p>
-                        {trx.paymentStatus && (
-                          <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
-                            trx.paymentStatus === 'completed' ? 'bg-green-100 text-green-700' :
-                            trx.paymentStatus === 'partial' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {trx.paymentStatus}
-                          </span>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1">
+                          {trx.paymentStatus && (
+                            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
+                              trx.paymentStatus === 'completed' ? 'bg-green-100 text-green-700' :
+                              trx.paymentStatus === 'partial' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {trx.paymentStatus}
+                            </span>
+                          )}
+                          {trx.isBookingAmount && (
+                            <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300" title="Booking Amount Paid">
+                              🏷️ Booking (₹{(trx.amountPaid || trx.bookingAmount || 0).toLocaleString()})
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="p-4 text-xs text-gray-600 font-medium">
