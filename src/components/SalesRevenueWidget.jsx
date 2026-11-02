@@ -12,6 +12,8 @@ import {
   FaTimes,
   FaSync,
   FaFileInvoiceDollar,
+  FaFileExcel,
+  FaDownload,
   FaUserTie,
   FaPhoneAlt,
   FaExternalLinkAlt
@@ -57,6 +59,8 @@ export default function SalesRevenueWidget({
   const [modalTotal, setModalTotal] = useState(0);
   const [modalPage, setModalPage] = useState(1);
   const [modalTarget, setModalTarget] = useState({ date: null, month: null });
+  const [modalSearch, setModalSearch] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
 
   const summary = salesData?.summary || {};
   const today = summary.today || { count: 0, revenue: 0, amountPaid: 0, pendingAmount: 0 };
@@ -137,6 +141,7 @@ export default function SalesRevenueWidget({
     setModalTitle(label || date || month);
     setModalOpen(true);
     setModalPage(1);
+    setModalSearch("");
     await fetchDrilldownLeads({ date, month, page: 1 });
   };
 
@@ -148,7 +153,7 @@ export default function SalesRevenueWidget({
       if (date) q.append("date", date);
       if (month) q.append("month", month);
       q.append("page", page);
-      q.append("limit", 15);
+      q.append("limit", 1000); // Fetch all approved sales leads for this period
       q.append("details", "true");
 
       const res = await axios.get(`${baseUrl}/accounts/sales-revenue?${q.toString()}`, {
@@ -166,6 +171,101 @@ export default function SalesRevenueWidget({
       setModalLoading(false);
     }
   };
+
+  const exportLeadsToCSVFallback = (leads, label) => {
+    if (!leads || leads.length === 0) {
+      toast.error("No sales records to export");
+      return;
+    }
+    const headers = [
+      "S.No",
+      "Customer Name",
+      "Phone",
+      "Email",
+      "City",
+      "State",
+      "Sales Representative",
+      "Deal Value (INR)",
+      "Amount Paid (INR)",
+      "Pending Amount (INR)",
+      "Payment Status",
+      "Verification Status",
+      "Approved Date"
+    ];
+    const rows = leads.map((l, i) => [
+      i + 1,
+      `"${(l.name || "").replace(/"/g, '""')}"`,
+      `"${l.phone || ""}"`,
+      `"${l.email || ""}"`,
+      `"${l.city || ""}"`,
+      `"${l.state || ""}"`,
+      `"${(l.salesPersonName || "Unassigned").replace(/"/g, '""')}"`,
+      l.dealValue || 0,
+      l.amountPaid || 0,
+      l.pendingAmount || 0,
+      `"${(l.paymentStatus || "verified").toUpperCase()}"`,
+      `"${(l.verificationStatus || "approved").toUpperCase()}"`,
+      `"${l.effectiveDate ? new Date(l.effectiveDate).toLocaleDateString("en-IN") : (l.dateStr || "")}"`
+    ]);
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Approved_Sales_${label}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    toast.success(`Sales report for ${label} downloaded!`);
+  };
+
+  const handleExportExcel = async (targetOverride) => {
+    const target = targetOverride || modalTarget;
+    if (!baseUrl || !token) return;
+    setIsExporting(true);
+    const fileLabel = target?.month || target?.date || "All";
+    try {
+      const q = new URLSearchParams();
+      if (target?.date) q.append("date", target.date);
+      if (target?.month) q.append("month", target.month);
+
+      const res = await axios.get(`${baseUrl}/accounts/sales-revenue/export/excel?${q.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob"
+      });
+
+      const blob = new Blob([res.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Approved_Sales_${fileLabel}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`Excel Sheet for ${fileLabel} downloaded successfully!`);
+    } catch (err) {
+      console.warn("Direct excel download error, using fallback CSV:", err);
+      exportLeadsToCSVFallback(modalLeads, fileLabel);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const filteredModalLeads = useMemo(() => {
+    if (!modalSearch) return modalLeads;
+    const q = modalSearch.toLowerCase().trim();
+    return modalLeads.filter(
+      (l) =>
+        l.name?.toLowerCase().includes(q) ||
+        l.phone?.includes(q) ||
+        l.city?.toLowerCase().includes(q) ||
+        l.salesPersonName?.toLowerCase().includes(q)
+    );
+  }, [modalLeads, modalSearch]);
 
   const getMediaUrl = (url) => {
     if (!url) return "";
@@ -552,18 +652,34 @@ export default function SalesRevenueWidget({
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={() =>
-                            handleOpenDrilldown({
-                              date: row.date,
-                              label: `Sales on ${row.formattedDate || row.date}`
-                            })
-                          }
-                          className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-xs"
-                        >
-                          <FaEye className="text-xs" />
-                          View Sales ({row.count})
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() =>
+                              handleOpenDrilldown({
+                                date: row.date,
+                                label: `Sales on ${row.formattedDate || row.date}`
+                              })
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-xs"
+                          >
+                            <FaEye className="text-xs" />
+                            View Sales ({row.count})
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleExportExcel({
+                                date: row.date,
+                                label: row.formattedDate || row.date
+                              })
+                            }
+                            disabled={isExporting}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-all border border-emerald-200 shadow-xs"
+                            title={`Export Excel for ${row.formattedDate || row.date}`}
+                          >
+                            <FaFileExcel className="text-xs" />
+                            Excel
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -612,18 +728,34 @@ export default function SalesRevenueWidget({
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-center">
-                      <button
-                        onClick={() =>
-                          handleOpenDrilldown({
-                            month: row.month,
-                            label: `Sales for ${row.monthLabel || row.month}`
-                          })
-                        }
-                        className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-xs"
-                      >
-                        <FaEye className="text-xs" />
-                        View Sales ({row.count})
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() =>
+                            handleOpenDrilldown({
+                              month: row.month,
+                              label: `Sales for ${row.monthLabel || row.month}`
+                            })
+                          }
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-xs"
+                        >
+                          <FaEye className="text-xs" />
+                          View Sales ({row.count})
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleExportExcel({
+                              month: row.month,
+                              label: row.monthLabel || row.month
+                            })
+                          }
+                          disabled={isExporting}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-all border border-emerald-200 shadow-xs"
+                          title={`Export Excel for ${row.monthLabel || row.month}`}
+                        >
+                          <FaFileExcel className="text-xs" />
+                          Excel
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -642,8 +774,9 @@ export default function SalesRevenueWidget({
       {/* Drilldown Modal: Viewing exact leads for selected Date or Month */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-4xl max-h-[85vh] bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden">
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+          <div className="w-full max-w-4xl max-h-[88vh] bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-bold text-gray-800">
@@ -657,25 +790,63 @@ export default function SalesRevenueWidget({
                   Individual customer deals counted towards real-time revenue.
                 </p>
               </div>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-              >
-                <FaTimes size={18} />
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleExportExcel(modalTarget)}
+                  disabled={isExporting || modalLeads.length === 0}
+                  className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs disabled:opacity-50"
+                  title="Export All Sales to Excel Sheet"
+                >
+                  <FaFileExcel className="text-sm" />
+                  {isExporting ? "Exporting..." : "Export Excel Sheet"}
+                </button>
+                <button
+                  onClick={() => setModalOpen(false)}
+                  className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                  <FaTimes size={18} />
+                </button>
+              </div>
             </div>
 
+            {/* Modal Search Bar */}
+            <div className="px-5 py-3 border-b border-gray-50 bg-gray-50/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="relative w-full sm:w-80">
+                <input
+                  type="text"
+                  placeholder="Search in sales by name, phone, city, rep..."
+                  value={modalSearch}
+                  onChange={(e) => setModalSearch(e.target.value)}
+                  className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <FaSearch className="absolute left-2.5 top-2.5 text-[10px] text-gray-400" />
+                {modalSearch && (
+                  <button
+                    onClick={() => setModalSearch("")}
+                    className="absolute right-2 top-2 text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    <FaTimes size={12} />
+                  </button>
+                )}
+              </div>
+              <span className="text-xs font-semibold text-gray-500">
+                Showing {filteredModalLeads.length} of {modalTotal} deals
+              </span>
+            </div>
+
+            {/* Modal Body */}
             <div className="p-5 overflow-y-auto flex-1">
               {modalLoading ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
                   <span className="text-xs font-medium text-gray-500">
-                    Loading approved sales leads...
+                    Loading all approved sales leads...
                   </span>
                 </div>
-              ) : modalLeads.length > 0 ? (
+              ) : filteredModalLeads.length > 0 ? (
                 <div className="space-y-3">
-                  {modalLeads.map((lead) => (
+                  {filteredModalLeads.map((lead) => (
                     <div
                       key={lead._id}
                       className="p-4 rounded-xl border border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-xs transition-shadow"
@@ -737,12 +908,23 @@ export default function SalesRevenueWidget({
                 </div>
               ) : (
                 <div className="text-center py-12 text-xs text-gray-400">
-                  No lead details found for this period.
+                  {modalSearch
+                    ? "No matching sales found for your search term."
+                    : "No lead details found for this period."}
                 </div>
               )}
             </div>
 
-            <div className="p-4 border-t border-gray-100 flex justify-end">
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-100 flex items-center justify-between">
+              <button
+                onClick={() => handleExportExcel(modalTarget)}
+                disabled={isExporting || modalLeads.length === 0}
+                className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs disabled:opacity-50"
+              >
+                <FaFileExcel className="text-sm" />
+                {isExporting ? "Exporting..." : "Export Excel Sheet"}
+              </button>
               <button
                 onClick={() => setModalOpen(false)}
                 className="px-5 py-2 text-xs font-bold rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
