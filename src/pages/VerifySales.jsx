@@ -1,9 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Filter, CheckCircle, XCircle, Eye, Calendar, Download, User, ShoppingBag, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Filter, CheckCircle, XCircle, Eye, Calendar, Download, User, ShoppingBag, RotateCcw, IndianRupee, Layers, Check, Clock } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
+
+const formatINR = (val) => {
+  const num = Number(val) || 0;
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
+  }).format(num);
+};
 
 const getStatusStyle = (status) => {
   switch (status?.toLowerCase()) {
@@ -60,17 +69,49 @@ export default function VerifySales() {
     }
   }, [token]);
 
+  const formatDateLocal = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleQuickDatePreset = (preset) => {
+    const now = new Date();
+    if (preset === 'today') {
+      const today = formatDateLocal(now);
+      setStartDate(today);
+      setEndDate(today);
+    } else if (preset === 'yesterday') {
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      const yStr = formatDateLocal(y);
+      setStartDate(yStr);
+      setEndDate(yStr);
+    } else if (preset === 'thisMonth') {
+      const start = formatDateLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+      const end = formatDateLocal(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+      setStartDate(start);
+      setEndDate(end);
+    } else if (preset === 'lastMonth') {
+      const start = formatDateLocal(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+      const end = formatDateLocal(new Date(now.getFullYear(), now.getMonth(), 0));
+      setStartDate(start);
+      setEndDate(end);
+    } else if (preset === 'all') {
+      setStartDate('');
+      setEndDate('');
+    }
+  };
+
   const fetchSales = async () => {
     try {
       setLoading(true);
       setError('');
       
       const params = new URLSearchParams();
-      params.append('limit', '1000');
+      params.append('limit', '2000');
 
-      if (statusFilter !== 'all') {
-        params.append('verificationStatus', statusFilter);
-      }
       if (salesPersonFilter && salesPersonFilter !== 'all') {
         params.append('assignedTo', salesPersonFilter);
       }
@@ -105,11 +146,11 @@ export default function VerifySales() {
     if (token) {
       fetchSales();
     }
-  }, [token, statusFilter, salesPersonFilter, startDate, endDate]);
+  }, [token, salesPersonFilter, startDate, endDate]);
 
   const handleResetFilters = () => {
     setSearchTerm('');
-    setStatusFilter('pending');
+    setStatusFilter('all');
     setSalesPersonFilter('all');
     setStartDate('');
     setEndDate('');
@@ -149,11 +190,7 @@ export default function VerifySales() {
 
         if (response.data.status === 'success') {
           Swal.fire('Success!', `Lead has been ${status}.`, 'success');
-          if (statusFilter === 'pending') {
-            setLeads(prev => prev.filter(lead => lead._id !== id));
-          } else {
-            fetchSales();
-          }
+          fetchSales();
         } else {
           Swal.fire('Error', 'Failed to update verification status', 'error');
         }
@@ -164,18 +201,73 @@ export default function VerifySales() {
     }
   };
 
-  const filteredLeads = leads.filter(lead => {
+  // Filter leads by status and search
+  const filteredLeads = useMemo(() => {
+    return leads.filter((lead) => {
+      // 1. Status Filter Tab
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'rejected') {
+          if (lead.verificationStatus !== 'rejected') return false;
+        } else if (statusFilter === 'verified') {
+          if (lead.verificationStatus !== 'verified') return false;
+        } else if (statusFilter === 'pending') {
+          if (lead.verificationStatus === 'verified' || lead.verificationStatus === 'rejected') return false;
+        }
+      }
+
+      // 2. Search Term
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase().trim();
+        const matchesName = lead.name?.toLowerCase().includes(term);
+        const matchesId = lead._id?.toLowerCase().includes(term);
+        const matchesPhone = lead.phone?.includes(term);
+        const matchesSalesPerson = lead.assignedTo?.name?.toLowerCase().includes(term) || lead.assignedTo?.email?.toLowerCase().includes(term);
+        const matchesProduct = (lead.productId?.name || '').toLowerCase().includes(term) || (lead.productDetails || '').toLowerCase().includes(term);
+        return matchesName || matchesId || matchesPhone || matchesSalesPerson || matchesProduct;
+      }
+
+      return true;
+    });
+  }, [leads, statusFilter, searchTerm]);
+
+  // Tab counts for current search and filters
+  const tabCounts = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
-    if (!term) return true;
+    const matchingSearch = leads.filter((lead) => {
+      if (!term) return true;
+      const matchesName = lead.name?.toLowerCase().includes(term);
+      const matchesId = lead._id?.toLowerCase().includes(term);
+      const matchesPhone = lead.phone?.includes(term);
+      const matchesSalesPerson = lead.assignedTo?.name?.toLowerCase().includes(term) || lead.assignedTo?.email?.toLowerCase().includes(term);
+      const matchesProduct = (lead.productId?.name || '').toLowerCase().includes(term) || (lead.productDetails || '').toLowerCase().includes(term);
+      return matchesName || matchesId || matchesPhone || matchesSalesPerson || matchesProduct;
+    });
 
-    const matchesName = lead.name?.toLowerCase().includes(term);
-    const matchesId = lead._id?.toLowerCase().includes(term);
-    const matchesPhone = lead.phone?.includes(term);
-    const matchesSalesPerson = lead.assignedTo?.name?.toLowerCase().includes(term);
-    const matchesProduct = (lead.productId?.name || '').toLowerCase().includes(term) || (lead.productDetails || '').toLowerCase().includes(term);
+    return {
+      pending: matchingSearch.filter(l => l.verificationStatus !== 'verified' && l.verificationStatus !== 'rejected').length,
+      verified: matchingSearch.filter(l => l.verificationStatus === 'verified').length,
+      rejected: matchingSearch.filter(l => l.verificationStatus === 'rejected').length,
+      all: matchingSearch.length
+    };
+  }, [leads, searchTerm]);
 
-    return matchesName || matchesId || matchesPhone || matchesSalesPerson || matchesProduct;
-  });
+  // Total sums of deal value, amount paid, and pending
+  const totals = useMemo(() => {
+    return filteredLeads.reduce((acc, lead) => {
+      const dealVal = Number(lead.dealValue || lead.totalAmount) || 0;
+      const paid = Number(lead.amountPaid || (lead.isBookingAmount ? lead.bookingAmount : 0)) || 0;
+      let pending = Number(lead.pendingAmount);
+      if (isNaN(pending) || pending === 0) {
+        pending = Math.max(0, dealVal - paid);
+      }
+      return {
+        count: acc.count + 1,
+        dealValue: acc.dealValue + dealVal,
+        amountPaid: acc.amountPaid + paid,
+        pendingAmount: acc.pendingAmount + pending
+      };
+    }, { count: 0, dealValue: 0, amountPaid: 0, pendingAmount: 0 });
+  }, [filteredLeads]);
 
   const handleExport = () => {
     if (!filteredLeads || filteredLeads.length === 0) {
@@ -220,6 +312,8 @@ export default function VerifySales() {
       const salesPersonName = lead.assignedTo?.name || 'Unassigned';
       const salesPersonEmail = lead.assignedTo?.email || '';
 
+      const saleDateVal = lead.saleConfirmedAt || lead.verifiedAt || lead.transferApprovedAt || lead.createdAt;
+
       const row = [
         escapeCsv(lead._id),
         escapeCsv(lead.name || ''),
@@ -236,7 +330,7 @@ export default function VerifySales() {
         escapeCsv(lead.pendingAmount || 0),
         escapeCsv(lead.paymentMode || ''),
         escapeCsv(lead.paymentStatus || ''),
-        escapeCsv(lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : ''),
+        escapeCsv(saleDateVal ? new Date(saleDateVal).toLocaleDateString() : ''),
         escapeCsv(lead.status || ''),
         escapeCsv(lead.verificationStatus || 'pending'),
         escapeCsv(lead.accountRemarks || '')
@@ -307,33 +401,69 @@ export default function VerifySales() {
           </div>
 
           {/* Date Range Inputs */}
-          <div className="md:col-span-4 flex items-center gap-2">
-            <div className="relative flex-1">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs text-gray-700 font-medium"
-                title="Start Date"
-              />
+          <div className="md:col-span-4 flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs text-gray-700 font-medium cursor-pointer"
+                  title="Start Date"
+                />
+              </div>
+              <span className="text-xs font-semibold text-gray-400">to</span>
+              <div className="relative flex-1">
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs text-gray-700 font-medium cursor-pointer"
+                  title="End Date"
+                />
+              </div>
             </div>
-            <span className="text-xs font-semibold text-gray-400">to</span>
-            <div className="relative flex-1">
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs text-gray-700 font-medium"
-                title="End Date"
-              />
+            {/* Quick Date Presets */}
+            <div className="flex items-center gap-1.5 text-[10px]">
+              <span className="text-gray-400 font-semibold">Quick:</span>
+              <button
+                type="button"
+                onClick={() => handleQuickDatePreset('today')}
+                className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold transition cursor-pointer"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickDatePreset('thisMonth')}
+                className="px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold transition cursor-pointer"
+              >
+                This Month
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickDatePreset('lastMonth')}
+                className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold transition cursor-pointer"
+              >
+                Last Month
+              </button>
+              {(startDate || endDate) && (
+                <button
+                  type="button"
+                  onClick={() => handleQuickDatePreset('all')}
+                  className="px-1.5 py-0.5 rounded bg-red-50 hover:bg-red-100 text-red-600 font-bold transition cursor-pointer"
+                >
+                  Clear Date
+                </button>
+              )}
             </div>
           </div>
 
           {/* Reset Filters */}
-          <div className="md:col-span-1 flex items-center justify-end">
+          <div className="md:col-span-1 flex items-start justify-end pt-1">
             <button
               onClick={handleResetFilters}
-              title="Reset Filters"
+              title="Reset All Filters"
               className="w-full md:w-auto p-2.5 flex items-center justify-center text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-xl border border-gray-200 transition-colors text-xs font-medium cursor-pointer"
             >
               <RotateCcw size={16} />
@@ -344,23 +474,79 @@ export default function VerifySales() {
         {/* Status Filter Tabs */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-gray-100">
           <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-            {['pending', 'verified', 'rejected', 'all'].map(status => (
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'pending', label: 'Pending' },
+              { id: 'verified', label: 'Verified' },
+              { id: 'rejected', label: 'Rejected' }
+            ].map(({ id, label }) => (
               <button 
-                key={status}
-                onClick={() => setStatusFilter(status)}
+                key={id}
+                onClick={() => setStatusFilter(id)}
                 className={`px-4 py-1.5 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
-                  statusFilter === status 
+                  statusFilter === id 
                     ? 'bg-blue-600 text-white shadow-sm' 
                     : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200'
                 }`}
               >
-                {status} ({statusFilter === status ? filteredLeads.length : ''})
+                {label} ({tabCounts[id] ?? 0})
               </button>
             ))}
           </div>
 
           <div className="text-xs text-gray-500 font-medium">
             Showing <span className="font-bold text-gray-800">{filteredLeads.length}</span> records
+          </div>
+        </div>
+      </div>
+
+      {/* Total Leads & Revenue Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Count */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Total Leads</p>
+            <p className="text-2xl font-black text-gray-900 mt-1">{totals.count}</p>
+            <span className="text-[11px] text-gray-500 font-medium">Matching records</span>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg">
+            <Layers size={20} />
+          </div>
+        </div>
+
+        {/* Total Deal Value */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Total Deal Value</p>
+            <p className="text-2xl font-black text-blue-600 mt-1">{formatINR(totals.dealValue)}</p>
+            <span className="text-[11px] text-gray-500 font-medium">Cumulative sale value</span>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
+            <IndianRupee size={20} />
+          </div>
+        </div>
+
+        {/* Total Amount Received / Paid */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Amount Received</p>
+            <p className="text-2xl font-black text-emerald-600 mt-1">{formatINR(totals.amountPaid)}</p>
+            <span className="text-[11px] text-emerald-700 font-medium">Paid / Advance amount</span>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-green-50 text-green-600 flex items-center justify-center font-bold text-lg">
+            <Check size={20} />
+          </div>
+        </div>
+
+        {/* Total Pending / COD */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Pending / Balance</p>
+            <p className="text-2xl font-black text-amber-600 mt-1">{formatINR(totals.pendingAmount)}</p>
+            <span className="text-[11px] text-amber-700 font-medium">Balance to collect</span>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-lg">
+            <Clock size={20} />
           </div>
         </div>
       </div>
@@ -463,7 +649,7 @@ export default function VerifySales() {
                       </div>
                     </td>
                     <td className="p-4 text-xs text-gray-600 font-medium">
-                      {new Date(trx.createdAt).toLocaleDateString()}
+                      {new Date(trx.saleConfirmedAt || trx.verifiedAt || trx.transferApprovedAt || trx.createdAt).toLocaleDateString()}
                     </td>
                     <td className="p-4">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusStyle(trx.verificationStatus)}`}>
@@ -502,6 +688,34 @@ export default function VerifySales() {
                   </tr>
                 ))}
               </tbody>
+              {filteredLeads.length > 0 && (
+                <tfoot className="bg-gray-50 border-t-2 border-gray-200 font-extrabold text-xs text-gray-800">
+                  <tr>
+                    <td colSpan={4} className="p-4 text-left">
+                      <div className="flex items-center gap-2">
+                        <span className="uppercase tracking-wider text-gray-500 font-bold">Total Sum:</span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">
+                          {totals.count} {totals.count === 1 ? 'Lead' : 'Leads'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="space-y-0.5">
+                        <div className="text-sm font-black text-gray-900">{formatINR(totals.dealValue)}</div>
+                        <div className="text-[11px] font-bold text-emerald-600">
+                          Paid: {formatINR(totals.amountPaid)}
+                        </div>
+                        <div className="text-[11px] font-bold text-amber-600">
+                          Pending: {formatINR(totals.pendingAmount)}
+                        </div>
+                      </div>
+                    </td>
+                    <td colSpan={3} className="p-4 text-right text-gray-400 font-normal italic">
+                      Calculated from {filteredLeads.length} visible records
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         )}
