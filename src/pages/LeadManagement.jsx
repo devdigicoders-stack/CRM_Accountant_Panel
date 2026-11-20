@@ -24,6 +24,8 @@ export default function LeadManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [actionLoading, setActionLoading] = useState(false);
   const [openDropdownId, setOpenDropdownId] = useState(null);
 
@@ -520,6 +522,13 @@ export default function LeadManagement() {
     lead.phone?.includes(searchTerm)
   );
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / pageSize));
+  const paginatedLeads = filteredLeads.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className="space-y-6 pb-12">
       {/* Header Section */}
@@ -556,7 +565,8 @@ export default function LeadManagement() {
         ) : filteredLeads.length === 0 ? (
           <div className="p-8 text-center text-gray-500">No leads found.</div>
         ) : (
-          <div className="overflow-x-auto min-h-[400px]">
+          <>
+            <div className="overflow-x-auto min-h-[400px]">
             <table className="w-full text-left border-collapse min-w-[1000px]">
               <thead>
                 <tr className="bg-gray-50/80 text-gray-500 text-sm border-b border-gray-100">
@@ -570,7 +580,7 @@ export default function LeadManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredLeads.map((lead) => {
+                {paginatedLeads.map((lead) => {
                   const isNew = !seenLeads.includes(lead._id);
                   return (
                     <tr 
@@ -728,6 +738,54 @@ export default function LeadManagement() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {filteredLeads.length > 0 && (
+            <div className="p-4 bg-white border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600">
+              <div className="flex items-center gap-2">
+                <span>Show</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+                >
+                  <option value={25}>25 per page</option>
+                  <option value={50}>50 per page</option>
+                  <option value={100}>100 per page</option>
+                  <option value={filteredLeads.length}>All ({filteredLeads.length})</option>
+                </select>
+                <span>
+                  Showing <span className="font-bold text-gray-800">{(currentPage - 1) * pageSize + 1}</span> - <span className="font-bold text-gray-800">{Math.min(currentPage * pageSize, filteredLeads.length)}</span> of <span className="font-bold text-gray-800">{filteredLeads.length}</span> leads
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 font-semibold hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-1.5 font-bold text-gray-700 bg-gray-50 rounded-lg border border-gray-100">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className="px-3 py-1.5 rounded-lg border border-gray-200 font-semibold hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>
